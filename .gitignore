@@ -1,0 +1,10 @@
+# Local tools, data, and secrets
+.tools/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
