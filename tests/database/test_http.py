@@ -104,3 +104,14 @@ class DataAPI(unittest.TestCase):
         self.assertIn(status,(401,403),result)
         status,result=self.request(None,'votes')
         self.assertIn(status,(401,403),result)
+
+    def test_http_invitation_inspection_preserves_identity_boundary(self):
+        status,result=self.request(MEMBER,'rpc/inspect_invitation',{'p_invitation':str(self.inv)})
+        self.assertEqual(status,200,result)
+        self.assertEqual(result['nickname'],'Member')
+        self.assertEqual(set(result),{'season_id','season_name','year','nickname'})
+        status,result=self.request(OUTSIDER,'rpc/inspect_invitation',{'p_invitation':str(self.inv)})
+        self.assertEqual(status,403,result)
+        self.assertEqual(result['message'],'invitation_not_available')
+        status,result=self.request(None,'rpc/inspect_invitation',{'p_invitation':str(self.inv)})
+        self.assertIn(status,(401,403),result)

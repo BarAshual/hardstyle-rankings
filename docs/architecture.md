@@ -2,7 +2,7 @@
 
 ## Accepted Architecture Baseline
 
-This baseline is implemented by the database foundation; see [database-foundation.md](database-foundation.md) for contracts and verification. Use a mobile-first responsive web client, Supabase Auth with Google, and Supabase/Postgres for persistent data. GitHub is the source of truth; database migrations belong in source control. The web framework, hosting provider, and import tooling are not selected.
+This baseline is implemented by the database foundation; see [database-foundation.md](database-foundation.md) for contracts and verification. Use a mobile-first responsive web client, Supabase Auth with Google, and Supabase/Postgres for persistent data. GitHub is the source of truth; database migrations belong in source control. The frontend uses Vite, React, TypeScript, React Router, and supabase-js; hosting and import tooling remain unselected. See [frontend.md](frontend.md) for OAuth and browser recovery behavior.
 
 Keep the system simple enough for one developer. Prefer database constraints and narrowly scoped transactional operations over additional services. AI-authored database and security changes must remain explicit and reviewable.
 

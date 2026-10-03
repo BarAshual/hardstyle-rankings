@@ -54,7 +54,7 @@ There are no remaining product decisions blocking this database foundation. Prod
 - Full invitation expiry, revocation, resend, and Google-account-change features remain deferred. The accepted minimal identity contract is D24; broader features need not block the foundation.
 - Initial Super Like number: the API requires explicit nonnegative season configuration rather than a hard-coded product default. The product value can be chosen when creating a season.
 - Destructive catalog edits, merging/deduplication of voted tracks, retention, and account deletion: the foundation exposes no destructive operations and preserves history; final policy is deferred.
-- Empty-catalog completion presentation, nickname rules, deterministic ordering algorithm/seed, web framework, hosting, import/enrichment integrations, and production backup/restore operations. Production recovery is not a blocker to local foundation work, but must be defined and verified before real voting data is collected.
+- Empty-catalog completion presentation, nickname rules, deterministic ordering algorithm/seed, hosting, import/enrichment integrations, and production backup/restore operations. Production recovery is not a blocker to local foundation work, but must be defined and verified before real voting data is collected.
 - Scoring, tie-breaking, artist aggregation, result categories/toggles/defaults, party sequence, post-reveal individual vote visibility, and exceptional lifecycle corrections.
 
 ## Database Foundation Scope
@@ -88,3 +88,7 @@ UI, actual invitation email delivery/provider selection, Spotify import integrat
 ## Implementation Status
 
 Database foundation migrations, configuration, synthetic fixtures, and integration tests are implemented. No UI, results, external music/email integration, or Git commit is included. Verification results and environment limitations are recorded in database-foundation.md.
+
+## Frontend Implementation Note (2026-10-03)
+
+The first browser slice uses Vite/React/TypeScript and the normal Supabase Google OAuth PKCE flow. A read-only `inspect_invitation` RPC bridges private invitation validation and nickname collection without creating membership or exposing the invitation table. `accept_invitation` remains the sole invited-membership write boundary. Nickname uniqueness is not required; no uniqueness constraint was added. See [frontend.md](frontend.md) for the compatibility details and manual OAuth setup. No results, voting UI, or admin dashboard is introduced.
