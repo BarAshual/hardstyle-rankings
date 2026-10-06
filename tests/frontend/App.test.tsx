@@ -44,6 +44,7 @@ function fake(identity: Identity | null = user) {
     }),
     accept: vi.fn().mockResolvedValue(sid),
     home: vi.fn().mockResolvedValue(home),
+    myPicks: vi.fn().mockResolvedValue([]),
     nextTrack: vi.fn().mockResolvedValue(null),
     castVote: vi.fn(),
   } satisfies API;

@@ -42,6 +42,8 @@ The implementation binds UUIDs to the authenticated actor across seasons, serial
 
 ## Client Recovery and Ordering
 
+My Picks reads the caller’s own `votes` through existing RLS, joining season track metadata and ordered artist credits. It uses keyset pagination to avoid the Data API row cap, then filters/searches locally. It has no group preference query or result API.
+
 Treat the database as authoritative. Retain the action UUID and payload across retries and reconcile uncertain outcomes before reporting a durable success. Distinguish pending actions from confirmed votes and recover from lost responses without asking users to rerate.
 
 Select the next track by excluding current votes from the current active season catalog, including tracks added after voting began. The read-only `next_unrated_track` RPC orders by MD5 of user/season/track UUIDs with a track UUID tie-breaker. It returns only the caller’s next active unvoted track metadata. Derive completion and Super Like usage from persisted data; do not store mutable progress indexes or usage counters.
@@ -57,3 +59,9 @@ Reliable recovery is a priority alongside durable writes. The database foundatio
 ## Deferred Results Architecture
 
 `REVEAL` is a prerequisite, not automatic authorization for every result category or individual raw vote. Admin-controlled category visibility is an accepted future product direction; its mechanism and defaults remain open. The database foundation collects and protects source data only: no scoring, leaderboards, result aggregation APIs, artist rankings, similarity, party presentation, reveal-category implementation, or persisted result snapshots.
+
+## Editing and nickname identity
+
+The rating and My Picks screens share one localStorage pending-action journal and receipt-validation helper. First votes use version 0; edits use the displayed authoritative version. Both retain the exact payload across uncertain outcomes, including after reload or sign-out. Replayed receipts are followed by fresh current-state reads because a later device may already have edited the vote. On version conflict, refresh current choices and require a new explicit user action. Same-choice buttons do not invoke the RPC. Closed seasons allow own-pick reads and accepted-action retries, but not new edits.
+
+The approved nickname rule is now season-scoped case-insensitive uniqueness, enforced by an expression index. A new migration narrows invitation acceptance’s conflict target to its membership primary key, so nickname conflicts fail atomically with a sanitized message. Existing identity, invitation binding, locks, votes, audits, and RLS remain unchanged.

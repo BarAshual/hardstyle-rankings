@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -25,6 +27,9 @@ import {
 } from "./api";
 
 import { Rating } from "./Rating";
+const MyPicks = lazy(() =>
+  import("./MyPicks").then((module) => ({ default: module.MyPicks })),
+);
 
 const pendingKey = "hardstyle.pending-invitation";
 function pendingInvite() {
@@ -421,6 +426,9 @@ function SeasonHome() {
       <p className="footnote">
         Your votes are yours. The group’s preferences stay private until reveal.
       </p>
+      <Link className="button" to={`/seasons/${seasonId}/my-picks`}>
+        My Picks
+      </Link>
       {
         <Link className="button primary" to={`/seasons/${seasonId}/rate`}>
           {season.state === "VOTING"
@@ -472,6 +480,16 @@ function Shell() {
             element={
               <RequireAuth>
                 <Invite key={identity?.id} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/seasons/:seasonId/my-picks"
+            element={
+              <RequireAuth>
+                <Suspense fallback={<Loading />}>
+                  <MyPicks />
+                </Suspense>
               </RequireAuth>
             }
           />

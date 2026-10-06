@@ -10,7 +10,7 @@ Versioned migrations implement this baseline. See [database-foundation.md](datab
 | --- | --- |
 | `seasons` | Annual season name/year, lifecycle state, and Super Like allowance configuration. |
 | `season_invitations` | Admin-invited email for a season; may exist before authentication and without a user ID. Normalized email is unique per season; acceptance records user ID and timestamp. |
-| `season_members` | Membership keyed by season and authenticated user; season-specific nickname. Created only after validating the invited Google identity. Role is member or admin; creator is the first admin. |
+| `season_members` | Membership keyed by season and authenticated user; season-specific nickname. Created only after validating the invited Google identity. Role is member or admin; creator is the first admin. Display nickname casing is preserved; `(season_id, lower(btrim(nickname)))` is unique. |
 | `tracks` | Canonical track identity, title, artwork, Spotify/Apple Music references, and metadata. Provider matching rules are undecided. |
 | `artists` | Canonical artist identity and metadata. |
 | `track_artists` | Many-to-many track/artist association; credit ordering and roles may be needed. |

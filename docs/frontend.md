@@ -4,7 +4,7 @@
 
 Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. The first voting UI is described below. There is no admin dashboard, result calculation, email delivery, or music-provider integration.
 
-The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, and `/seasons/:seasonId/rate`. BrowserRouter requires a production host to serve index.html for these paths; hosting is not selected yet. The dev server already provides that fallback.
+The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, `/seasons/:seasonId/rate`, and `/seasons/:seasonId/my-picks`. BrowserRouter requires a production host to serve index.html for these paths; hosting is not selected yet. The dev server already provides that fallback.
 
 ## Run locally
 
@@ -97,7 +97,7 @@ The original `accept_invitation(p_invitation, p_nickname)` correctly creates mem
 
 The additive migration `20261003000100_invitation_preview.sql` supplies a narrow **read-only** `inspect_invitation(p_invitation)` RPC. It reuses `private.google_email()`, matches the normalized invited email, rejects acceptance bound to another user, and returns only `{season_id, season_name, year, nickname}` for the verified invited identity. Nickname is null for a new member. It reveals no invited email, membership list, votes, or aggregates. Anonymous execution is revoked. Existing RLS, mutation grants, voting locks, and the first three migrations are unchanged. Acceptance still revalidates the identity and invitation at submission time.
 
-For an existing member, inspection returns their saved nickname and the app goes directly home. For a new member, nickname selection happens before the membership-creating RPC. Nicknames currently allow duplicates; no uniqueness rule was invented. The UI also safely handles a 23505 rejection should a future reviewed constraint introduce conflicts. Unknown invitations and wrong-account invitations deliberately share `invitation_not_available`, so the UI does not claim to distinguish them.
+For an existing member, inspection returns their saved nickname and the app goes directly home. For a new member, nickname selection happens before the membership-creating RPC. Nicknames are now unique case-insensitively within a season. The UI handles `nickname_unavailable` / 23505 with a friendly request to choose another name and never displays raw constraint details. Unknown invitations and wrong-account invitations deliberately share `invitation_not_available`, so the UI does not claim to distinguish them.
 
 ## Home, errors, and privacy
 
@@ -135,7 +135,7 @@ Before sending a vote, the browser writes its full action payload and display me
 
 Network/unknown errors retain the pending action and show Retry pending vote. Definitive version/action conflicts, allowance errors, inactive tracks, closed voting, and lost membership show friendly messages and refresh authoritative state. The screen never upgrades expected_version to edit an existing vote. A different-device first vote is preserved. If receipt reconciliation succeeds but the next read fails, retry reloads the queue without sending another vote. Corrupt/unavailable local storage blocks new submissions rather than silently dropping an uncertain action. Cross-device and simultaneous-tab races are ultimately resolved by the database version/idempotency contract; no browser lock is treated as authority.
 
-No existing vote edits, gestures, results, scores, provider import, or admin UI are included.
+My Picks below adds existing-vote edits. Gestures, results, scores, provider import, and admin UI remain excluded.
 
 ### Local development catalog
 
@@ -161,3 +161,54 @@ Voting verification: **37 frontend tests** passed, with typecheck, ESLint, and p
 ## Core voting milestone verification (2026-10-06)
 
 Before tagging `v0.1.0-core-voting`, all 37 frontend tests and 39 database/API tests passed again. TypeScript, ESLint, production build, database lint, documentation links, Python/shell syntax, and whitespace checks passed. The isolated local stack was cleanly rebuilt from all five migrations, with Studio on port 55423 and Google disabled for synthetic tests; the ordinary local database was not reset. Local credential files, Studio snippets, runtimes, and test artifacts remain ignored. No new product features were added during milestone preparation.
+
+## My Picks and editing
+
+Home keeps its rating action and adds **My Picks** at `/seasons/:seasonId/my-picks`. Only the signed-in user’s choices are requested. Cards show artwork, title, ordered artist credits, current choice, and available external music links. Search title/artist and filter All / Likes / Super Likes / Passes locally. The client pages through all own votes rather than silently stopping at the Data API row limit. Empty catalogs/choices and no matching filters have separate states. Inactive rated tracks remain visible but cannot be edited.
+
+During VOTING, choose a different PASS / LIKE / SUPER LIKE to edit. The RPC receives the current vote version and a new action UUID. Same-choice buttons are disabled and the handler is a no-op. After acceptance the client reloads current choices/versions and authoritative personal progress. Changing away from SUPER_LIKE frees allowance through derived usage; invalid promotion shows the existing friendly limit error. A stale version reloads the latest choice and asks the user to review it; it never automatically resubmits using a new version.
+
+Both screens use the same user/season/action journal and receipt validator. Pending version-0 records remain compatible; edits record a positive expected version. A pending action is shown independently of filters and blocks new edits until reconciled. Unknown failures retain the exact payload; retries reuse it across reload/relogin and navigation between Rating and My Picks. Requests are scoped to the captured actor token. After replay, current state is reloaded even if the receipt is older than another device’s edit. No duplicate local persistence layer or independent allowance counter exists.
+
+My Picks refreshes on window focus and offers Refresh picks. If the season locks while open, the backend rejects a new edit and the screen reloads its read-only state. Own choices remain readable after LOCKED and REVEAL; no group data/results appear. Pending accepted-action retries remain possible after closure.
+
+### Quality gate and local checks
+
+`.github/workflows/quality.yml` runs on pull requests and pushes with read-only repository permissions. The frontend job installs pinned dependencies with `npm ci` under Node 22.23.3, then runs tests, typecheck, lint, build, and whitespace checks. The database job uses Python 3.12 and Supabase CLI 2.119.0 on Ubuntu’s Docker runner: disables Google and Studio only in the disposable checkout, starts Supabase, rebuilds all migrations and synthetic fixtures, lints the database, and runs the guarded direct-database and HTTP suite sequentially. Cleanup runs even on failure. No real credentials or remote Supabase project are required; startup logs stay unuploaded because CLI output can contain local signing material.
+
+Official action sources: [Node setup](https://github.com/actions/setup-node) and [Supabase CLI setup](https://github.com/supabase/setup-cli). Actions are pinned to immutable commits. The workflow is authored and locally linted; an actual hosted GitHub Actions run requires committing/pushing it. No claim is made that hosted CI has already passed. The two job checks should be configured as required PR checks by the repository owner if merge enforcement is desired.
+
+Continue running the local frontend checks and `scripts/test-db.sh` plus `supabase db lint --local --level warning` before merge. Clean reset/testing uses the isolated synthetic stack described above, now with six migrations and Studio disabled like CI. Apply the new migration to an existing real-account local database with `supabase migration up --local`, after checking nickname collisions. Do not reset that database.
+
+### Manual pilot checks
+
+1. Sign in, open Home → My Picks. Search a title and artist, try each filter, and check missing-link placeholders.
+2. Change LIKE → PASS → LIKE → SUPER LIKE → LIKE; confirm remaining allowance changes and survives refresh/relogin. Selecting the existing choice does nothing.
+3. Load the same pick in two browser sessions, edit it in one, then submit a stale edit in the other. The latter must show the conflict and reload the newer choice. It must not overwrite automatically.
+4. Interrupt a submission’s response, reload, and use Retry pending vote. Confirm one version increment and one audit event for that logical action.
+5. In a disposable test season, advance VOTING → LOCKED through the existing admin RPC. Own picks remain visible, and edits are rejected/disabled. This transition cannot be undone.
+
+### Two real Google accounts: invitation boundary
+
+Use Account A’s exact invited Google email and Account B that is **not already a member of this test season**. Use separate browser profiles/private windows to keep sessions independent. Google accounts must be permitted by the OAuth consent screen’s testing configuration. These steps require real Google login; synthetic JWT tests do not replace them.
+
+- As season admin, create an invitation for Account A with the existing `invite_member` RPC and copy its URL.
+- Account A opens it and signs in with Google. Try an existing nickname using different casing: it must show a friendly conflict and leave the invite unaccepted. Choose an unused nickname, accept, reach Home, and verify refresh/sign-out/sign-in preserves membership and display casing.
+- Account B opens the **same forwarded URL**, signs in using its different Google email, and must see invitation unavailable. It must not gain membership.
+- In **local Supabase Studio** (`http://127.0.0.1:54323`), use Authentication → Users to identify A/B UUIDs. In Table Editor → `public.season_members`, filter by the test `season_id` and each `user_id`. A should have one row; B should have none. `public.season_invitations` should be accepted by A’s UUID. Avoid editing tables while verifying.
+- Alternatively, run this read-only owner query in Studio SQL Editor after replacing the placeholders:
+
+```sql
+select u.email, m.user_id is not null as is_member, m.nickname, m.role
+from auth.users u
+left join public.season_members m
+  on m.user_id = u.id and m.season_id = 'TEST_SEASON_UUID'::uuid
+where private.normalize_email(u.email) in (
+  private.normalize_email('ACCOUNT_A_EMAIL'),
+  private.normalize_email('ACCOUNT_B_EMAIL')
+);
+```
+
+Studio is privileged owner tooling: this confirms stored membership, not client RLS. The actual HTTP tests independently verify that forwarded invitations fail and raw choices remain private. Do not inspect/share other members’ votes as part of this check.
+
+My Picks milestone verification (2026-10-06): **56 frontend tests** and **45 database/API tests** passed (37 direct database tests, 8 real HTTP tests). Typecheck, ESLint, production build, six-migration clean isolated rebuild, database lint, and workflow actionlint passed. The My Picks route is split into a separate chunk; the main bundle stays below Vite’s default warning threshold. Browser verification against synthetic identities and real local PostgREST covered search/filter, Super Like release/limit, lost-response edit retry across reload, two-tab stale conflict, and locked read-only choices, without horizontal overflow or runtime errors. This did not exercise real Google OAuth. The normal local database had zero nickname collision groups; the additive migration and lint succeeded there without resetting accounts/votes.

@@ -35,6 +35,7 @@ Python dependencies are pinned in `tests/requirements.txt`. A normal `.venv` is 
 | `20261001000300_security.sql` | Explicit select policies and execute grants/revocations for named application objects; unrelated public objects/default privileges are untouched. |
 | `20261003000200_next_unrated_track.sql` | Additive read-only member queue, excluding own votes and returning track metadata in deterministic per-user order. |
 | `20261003000100_invitation_preview.sql` | Additive read-only invitation inspection, authorized for the matching verified Google identity only; supports existing-member bypass and nickname onboarding. |
+| `20261006000100_unique_season_nicknames.sql` | Case-insensitive per-season nickname index; preserves display casing and narrows invitation conflict handling with a sanitized duplicate-name error. |
 
 All foreign keys that protect voting history restrict deletion. Catalog rows have an `active` flag, but the foundation exposes addition only. No role-promotion, membership-removal, track deactivation/deletion, vote deletion, or audit rewrite API is provided. Provider metadata columns may remain null. Artist names are not assumed globally unique; manual input does not perform deduplication.
 
@@ -57,7 +58,7 @@ RPC names and parameters below match SQL/PostgREST. Every caller's user ID comes
 | `my_progress(p_season)` | Member's active catalog count, rated/unrated count, Super Likes used/available, and completion percentage. Usage counts all current votes. |
 | `admin_progress(p_season)` | Admin receives member ID/nickname/role and active track/rated/unrated counts and percentage. No vote choices, preference composition, or per-track breakdowns. |
 
-Nickname must be nonblank and at most 80 characters; uniqueness is not required. A zero-track catalog returns zero counts and null completion percentage, leaving presentation to the future UI. Membership presence is the active membership representation; revocation is not implemented.
+Nickname must be nonblank and at most 80 characters; `lower(btrim(nickname))` must be unique within its season. Display casing is preserved, and another season can reuse the name. A zero-track catalog returns zero counts and null completion percentage; the rating UI presents this as caught up with the current catalog. Membership presence is the active membership representation; revocation is not implemented.
 
 Invitation ID is a locator, not sufficient authorization. Auth-managed `auth.identities` must contain a Google identity with boolean `email_verified: true`; its normalized email must match confirmed `auth.users.email` and the invitation. User-editable `raw_user_meta_data` is ignored. A shared `private.normalize_email(text)` helper lowercases after stripping only surrounding POSIX whitespace (including spaces, tabs, and newlines); the invitation CHECK constraint uses it too. Internal whitespace, Gmail dots, and plus aliases are preserved. Acceptance stays tied to `auth.users.id`; account switching is deferred. The creator bootstrap is the deliberate exception to invitation-based membership. Any verified Google user can create their own isolated season; that creates no authority over existing seasons.
 
@@ -102,3 +103,18 @@ Before frontend integration, confirm real Google OAuth configuration and the loc
 ## Reference documentation
 
 The implementation follows Supabase's [RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security), [Auth identity model](https://supabase.com/docs/guides/auth/identities), and [local CLI configuration](https://supabase.com/docs/guides/local-development/cli/config). Provider credentials and owner/service keys remain deployment concerns, never application-admin privileges.
+
+## Nickname migration and My Picks reads
+
+Before applying the nickname migration to an existing database, check for collisions as its owner:
+
+```sql
+select season_id, lower(btrim(nickname)) as nickname_key, count(*)
+from public.season_members
+group by season_id, lower(btrim(nickname))
+having count(*) > 1;
+```
+
+Resolve any returned collisions deliberately before `supabase migration up --local`; the migration fails instead of renaming users or discarding membership. Index creation itself prevents concurrent duplicates. Invitation acceptance retains its season lock and email/account checks, now uses `ON CONFLICT (season_id,user_id) DO NOTHING`, and translates only the nickname-index violation to SQLSTATE 23505 / `nickname_unavailable`, without another member’s identity or raw constraint details. Failure rolls back membership and invitation acceptance together; a same-user accepted-invitation retry remains idempotent. No historical migration was edited.
+
+My Picks introduces no new RPC or table grant. The client reads `votes`, explicitly filtered by caller and season, joins `season_tracks → tracks → track_artists → artists`, orders by track UUID, and requests pages of 500 using an exclusive UUID cursor. It includes inactive rated tracks for viewing; new edits still require active catalog membership. RLS enforces ownership even if a caller removes/spoofs client filters. `cast_vote` is unchanged, including its current-version requirement, UUID ledger, audit checks, READ COMMITTED guard, and season-level locking.

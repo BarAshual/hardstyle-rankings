@@ -49,6 +49,7 @@ function fake() {
         completion_percent: 0,
       },
     })),
+    myPicks: vi.fn().mockResolvedValue([]),
     nextTrack: vi.fn(async () => catalog.find((t) => !votes.has(t.id)) ?? null),
     castVote: vi.fn(
       async (

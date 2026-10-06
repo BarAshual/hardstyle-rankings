@@ -91,8 +91,16 @@ Database foundation migrations, configuration, synthetic fixtures, and integrati
 
 ## Frontend Implementation Note (2026-10-03)
 
-The first browser slice uses Vite/React/TypeScript and the normal Supabase Google OAuth PKCE flow. A read-only `inspect_invitation` RPC bridges private invitation validation and nickname collection without creating membership or exposing the invitation table. `accept_invitation` remains the sole invited-membership write boundary. Nickname uniqueness is not required; no uniqueness constraint was added. See [frontend.md](frontend.md) for the compatibility details and manual OAuth setup. No results, voting UI, or admin dashboard is introduced.
+The first browser slice uses Vite/React/TypeScript and the normal Supabase Google OAuth PKCE flow. A read-only `inspect_invitation` RPC bridges private invitation validation and nickname collection without creating membership or exposing the invitation table. `accept_invitation` remains the sole invited-membership write boundary. At that milestone nickname uniqueness was not required; the 2026-10-06 decision below supersedes this. See [frontend.md](frontend.md) for the compatibility details and manual OAuth setup. No results, voting UI, or admin dashboard is introduced.
 
 ## First voting implementation (2026-10-03)
 
 The personal queue uses MD5 of colon-separated user/season/track UUIDs and a track UUID tie-breaker. This stable pseudo-random ordering requires no mutable index and naturally includes later catalog additions. Null queue results, including an empty catalog, mean “You’re caught up” with current rated/total and remaining allowance. A localStorage journal stores each pending action before transmission; unknown outcomes replay the same actor-bound UUID and payload. The existing cast_vote, expected-version, locks, RLS, audit, and derived allowance contracts are unchanged. A separate read-only queue RPC and explicitly invoked local fixture script support this slice; no results or scoring is added.
+
+## My Picks and nickname identity (2026-10-06)
+
+**D28 — accepted product change:** Within a season, nicknames must be unique case-insensitively. Preserve chosen display casing and permit reuse in another season. The uniqueness key is `lower(btrim(nickname))`, consistent with existing ordinary-space nickname trimming; no accent folding or extra Unicode normalization is introduced. Existing collisions stop the migration for explicit owner correction; do not rename users automatically.
+
+My Picks uses existing RLS table reads and the existing cast_vote RPC. Search/filter stays in the browser; pagination uses track UUIDs. A same-choice selection is a UI no-op. A stale edit reloads the current vote and waits for a new user decision. The shared pending journal accepts nonnegative integer expected versions and remains compatible with existing version-0 records. Raw votes remain private in LOCKED and REVEAL.
+
+GitHub Actions runs a minimal frontend job and a separate local Supabase integration job on disposable Ubuntu runners, with pinned actions/tool versions and no project/OAuth secrets. No new external service or deployment pipeline is introduced.

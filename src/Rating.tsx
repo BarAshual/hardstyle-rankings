@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "./auth";
 import { uuidPattern, type Choice, type Home, type Track } from "./api";
 import {
+  confirmPending,
   readPending,
   removePending,
   savePending,
@@ -24,7 +25,7 @@ export function musicURL(
     return null;
   }
 }
-function Artwork({ track }: { track: Track }) {
+export function Artwork({ track }: { track: Track }) {
   const [failed, setFailed] = useState(false);
   let url: URL | undefined;
   try {
@@ -51,7 +52,7 @@ function Artwork({ track }: { track: Track }) {
     </div>
   );
 }
-const rejected: Record<string, string> = {
+export const rejected: Record<string, string> = {
   super_like_limit:
     "You’ve used all your Super Likes. Choose PASS or LIKE instead.",
   voting_closed:
@@ -157,17 +158,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       return;
     }
     try {
-      const a = actionPending.action;
-      const receipt = await api.castVote(a);
-      if (
-        receipt.action_id !== a.action_id ||
-        receipt.season_id !== a.season_id ||
-        receipt.track_id !== a.track_id ||
-        receipt.choice !== a.choice ||
-        receipt.version !== 1
-      )
-        throw new Error("Unexpected vote receipt");
-      removePending(a);
+      await confirmPending(api, actionPending);
       if (!mounted.current) return;
       setPending(null);
       setReady(false);
