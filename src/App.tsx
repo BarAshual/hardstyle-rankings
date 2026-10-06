@@ -24,6 +24,8 @@ import {
   type Invitation,
 } from "./api";
 
+import { Rating } from "./Rating";
+
 const pendingKey = "hardstyle.pending-invitation";
 function pendingInvite() {
   try {
@@ -419,7 +421,16 @@ function SeasonHome() {
       <p className="footnote">
         Your votes are yours. The group’s preferences stay private until reveal.
       </p>
-      <p className="fine">The rating experience is coming next.</p>
+      {
+        <Link className="button primary" to={`/seasons/${seasonId}/rate`}>
+          {season.state === "VOTING"
+            ? progress.rated
+              ? "Continue rating"
+              : "Start rating"
+            : "View rating status"}{" "}
+          →
+        </Link>
+      }
     </section>
   );
 }
@@ -461,6 +472,14 @@ function Shell() {
             element={
               <RequireAuth>
                 <Invite key={identity?.id} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/seasons/:seasonId/rate"
+            element={
+              <RequireAuth>
+                <Rating />
               </RequireAuth>
             }
           />

@@ -44,11 +44,11 @@ The implementation binds UUIDs to the authenticated actor across seasons, serial
 
 Treat the database as authoritative. Retain the action UUID and payload across retries and reconcile uncertain outcomes before reporting a durable success. Distinguish pending actions from confirmed votes and recover from lost responses without asking users to rerate.
 
-Select the next track by excluding current votes from the current active season catalog, including tracks added after voting began. Eventually apply stable pseudo-random ordering per user/season with a deterministic tie-breaker. The seed and algorithm remain to be selected. Derive completion and Super Like usage from persisted data; do not store mutable progress indexes or usage counters.
+Select the next track by excluding current votes from the current active season catalog, including tracks added after voting began. The read-only `next_unrated_track` RPC orders by MD5 of user/season/track UUIDs with a track UUID tie-breaker. It returns only the caller’s next active unvoted track metadata. Derive completion and Super Like usage from persisted data; do not store mutable progress indexes or usage counters.
 
 ## Verification Priorities
 
-The database suite tests duplicate requests, UUID/payload conflicts, concurrent Super Likes, transaction rollback, audit atomicity, lost-response recovery, and locking races. It exercises both SQL roles and the actual local Data API, including admin secrecy and audit access. Browser reconnect/reload UX remains future frontend work. See database-foundation.md for test commands and results.
+The database suite tests duplicate requests, UUID/payload conflicts, concurrent Super Likes, transaction rollback, audit atomicity, lost-response recovery, and locking races. It exercises both SQL roles and the actual local Data API, including admin secrecy and audit access. The browser persists pending actions per user/season/action and replays identical payloads after uncertain responses or reload; frontend and real browser/API tests cover this recovery. See database-foundation.md for test commands and results.
 
 ## Recovery Planning
 

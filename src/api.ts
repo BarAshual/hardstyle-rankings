@@ -23,7 +23,34 @@ export type Progress = {
   completion_percent: number | null;
 };
 export type Home = { season: Season; nickname: string; progress: Progress };
+export type Choice = "PASS" | "LIKE" | "SUPER_LIKE";
+export type Track = {
+  id: string;
+  title: string;
+  artists: string[];
+  artwork_url: string | null;
+  spotify_url: string | null;
+  apple_music_url: string | null;
+};
+export type VoteAction = {
+  user_id: string;
+  season_id: string;
+  track_id: string;
+  choice: Choice;
+  expected_version: 0;
+  action_id: string;
+};
+export type VoteReceipt = {
+  action_id: string;
+  season_id: string;
+  track_id: string;
+  choice: Choice;
+  version: number;
+  accepted_at: string;
+};
 export interface API {
+  nextTrack(seasonId: string): Promise<Track | null>;
+  castVote(action: VoteAction): Promise<VoteReceipt>;
   restore(): Promise<Identity | null>;
   subscribe(listener: (identity: Identity | null) => void): () => void;
   signIn(): Promise<void>;
@@ -165,6 +192,32 @@ export function createAPI(url: string, key: string): API {
       });
       if (error) throw error;
       return data as string;
+    },
+    async nextTrack(seasonId) {
+      const { data, error } = await client.rpc("next_unrated_track", {
+        p_season: seasonId,
+      });
+      if (error) throw error;
+      return data as Track | null;
+    },
+    async castVote(action) {
+      const { data: session, error: sessionError } =
+        await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (session.session?.user.id !== action.user_id)
+        throw new Error("authentication_required");
+      const { data, error } = await client
+        .rpc("cast_vote", {
+          p_season: action.season_id,
+          p_track: action.track_id,
+          p_choice: action.choice,
+          p_expected_version: action.expected_version,
+          p_action: action.action_id,
+        })
+        .setHeader("Authorization", `Bearer ${session.session.access_token}`)
+        .abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data as VoteReceipt;
     },
     async home(seasonId, userId) {
       const [season, member, progress] = await Promise.all([

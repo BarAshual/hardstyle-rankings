@@ -30,7 +30,7 @@ enabled = false
 enabled = false
 
 [studio]
-enabled = false
+enabled = true
 
 [local_smtp]
 enabled = false

@@ -11,3 +11,9 @@ supabase/.branches/
 node_modules/
 dist/
 coverage/
+
+# Local Studio scratch queries and editor/system artifacts
+supabase/snippets/
+.DS_Store
+*.swp
+*.swo

@@ -36,16 +36,16 @@ function fake(identity: Identity | null = user) {
     memberships: vi
       .fn()
       .mockResolvedValue([{ season_id: sid, nickname: "Bar" }]),
-    inspect: vi
-      .fn()
-      .mockResolvedValue({
-        season_id: sid,
-        season_name: "Hardstyle 2026",
-        year: 2026,
-        nickname: null,
-      }),
+    inspect: vi.fn().mockResolvedValue({
+      season_id: sid,
+      season_name: "Hardstyle 2026",
+      year: 2026,
+      nickname: null,
+    }),
     accept: vi.fn().mockResolvedValue(sid),
     home: vi.fn().mockResolvedValue(home),
+    nextTrack: vi.fn().mockResolvedValue(null),
+    castVote: vi.fn(),
   } satisfies API;
   return { api, notify: (identity: Identity | null) => notify(identity) };
 }

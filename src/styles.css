@@ -322,3 +322,73 @@ footer {
     font-size: 62px;
   }
 }
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 24px;
+  text-underline-offset: 4px;
+}
+.rating-progress {
+  font-size: 13px;
+  color: #b4b4bd;
+}
+.track-art {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  margin: 24px auto;
+}
+.placeholder {
+  background: linear-gradient(135deg, #252a19, #333347 65%, #19191d);
+  border: 1px solid #55555a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  font:
+    700 48px "Barlow Condensed",
+    sans-serif;
+  color: #d8ee69;
+}
+.rating .track-title {
+  font-size: clamp(32px, 7vw, 52px);
+  line-height: 1.1;
+  margin: 16px 0 8px;
+  overflow-wrap: anywhere;
+}
+.track-artists {
+  color: #b4b4bd;
+  margin-top: 0;
+}
+.music-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 20px 0;
+  font-size: 13px;
+  color: #b4b4bd;
+}
+.vote-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.vote-actions .super {
+  grid-column: 1 / -1;
+  border-color: #d8ee69;
+  color: #d8ee69;
+}
+.vote-actions .like {
+  background: #d8ee69;
+  color: #14160c;
+}
+
+@media (max-width: 480px) {
+  .rating .track-art {
+    max-width: 280px;
+  }
+}

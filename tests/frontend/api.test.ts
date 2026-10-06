@@ -3,14 +3,18 @@ const mocks = vi.hoisted(() => ({
   exchange: vi.fn(),
   oauth: vi.fn(),
   create: vi.fn(),
+  rpc: vi.fn(),
+  session: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.create }));
 import { createAPI, friendlyError, nicknameError } from "../../src/api";
 beforeEach(() => {
   mocks.create.mockReturnValue({
+    rpc: mocks.rpc,
     auth: {
       exchangeCodeForSession: mocks.exchange,
       signInWithOAuth: mocks.oauth,
+      getSession: mocks.session,
     },
   });
 });
@@ -68,4 +72,41 @@ describe("client boundary", () => {
     );
     expect(friendlyError({ code: "23514" })).toContain("1–80");
   });
+});
+
+it("sends the exact first-vote payload with the captured actor token", async () => {
+  const result = { data: { version: 1 }, error: null };
+  const abortSignal = vi.fn().mockResolvedValue(result);
+  const setHeader = vi.fn().mockReturnValue({ abortSignal });
+  mocks.rpc.mockReturnValue({ setHeader });
+  mocks.session.mockResolvedValue({
+    data: { session: { user: { id: "actor" }, access_token: "test-token" } },
+    error: null,
+  });
+  const api = createAPI("http://127.0.0.1:54321", "sb_publishable_test");
+  const action = {
+    user_id: "actor",
+    season_id: "season",
+    track_id: "track",
+    choice: "LIKE" as const,
+    expected_version: 0 as const,
+    action_id: "action",
+  };
+  await api.castVote(action);
+  expect(mocks.rpc).toHaveBeenCalledWith("cast_vote", {
+    p_season: "season",
+    p_track: "track",
+    p_choice: "LIKE",
+    p_expected_version: 0,
+    p_action: "action",
+  });
+  expect(setHeader).toHaveBeenCalledWith("Authorization", "Bearer test-token");
+  mocks.session.mockResolvedValue({
+    data: {
+      session: { user: { id: "different-user" }, access_token: "other" },
+    },
+    error: null,
+  });
+  await expect(api.castVote(action)).rejects.toThrow("authentication_required");
+  expect(mocks.rpc).toHaveBeenCalledOnce();
 });

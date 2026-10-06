@@ -2,9 +2,9 @@
 
 ## Stack and scope
 
-Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. There is no voting UI, admin dashboard, result calculation, email delivery, or music integration.
+Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. The first voting UI is described below. There is no admin dashboard, result calculation, email delivery, or music-provider integration.
 
-The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, and `/seasons/:seasonId`. BrowserRouter requires a production host to serve index.html for these paths; hosting is not selected yet. The dev server already provides that fallback.
+The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, and `/seasons/:seasonId/rate`. BrowserRouter requires a production host to serve index.html for these paths; hosting is not selected yet. The dev server already provides that fallback.
 
 ## Run locally
 
@@ -21,7 +21,7 @@ npm run dev
 
 Open `http://127.0.0.1:3000`. Use this origin consistently, including during OAuth: localhost is a different origin and does not share the PKCE verifier or session storage. Port 3000 is strict; the server will not silently switch callback origins when the port is occupied.
 
-`db reset --local` is for a disposable local database. It rebuilds all four migrations and synthetic fixtures, and removes real local users/memberships. Run database tests before adding real Google users; the test safety guard deliberately rejects non-synthetic Auth data. To add the new migration to an existing local database without resetting it, use `supabase migration up --local`.
+`db reset --local` is for a disposable local database. It rebuilds all migrations and synthetic fixtures, and removes real local users/memberships. Run database tests before adding real Google users; the test safety guard deliberately rejects non-synthetic Auth data. To add the new migration to an existing local database without resetting it, use `supabase migration up --local`.
 
 Browser environment variables in ignored `.env.local`:
 
@@ -122,3 +122,42 @@ The database command uses the existing guarded, non-parallel runner. Frontend te
 Verified for this slice: **20 frontend tests passed**, TypeScript typecheck and ESLint passed, and the production build succeeded. A clean local Supabase rebuild applied all four migrations; database lint reported no schema errors and **35 database/HTTP integration tests passed**. A headless Chrome run at mobile and desktop sizes verified real browser-to-local-Supabase inspection, nickname acceptance, home progress, session restoration on refresh, accepted-invite bypass, and sign-out using a synthetic signed identity; no browser runtime errors or mobile horizontal overflow were observed. Real Google OAuth was not claimed as tested.
 
 Local Google provider verification: after loading credentials from root `.env` and restarting without resetting the database, `/auth/v1/settings` returned HTTP 200 with `external.google = true`. Clicking the frontend’s “Continue with Google” button returned HTTP 302 from `/auth/v1/authorize` to `accounts.google.com`. The browser check stopped before Google login; account consent and the completed callback still require manual verification. The 20 frontend tests, typecheck, lint, and build passed again.
+
+## Voting (first usable flow)
+
+Home links to `/seasons/:seasonId/rate`. During VOTING it says Start/Continue rating; otherwise View rating status also allows an outstanding accepted action to be reconciled after locking. The screen displays artwork (a local CSS placeholder when absent), ordered artists, and external HTTPS Spotify/Apple Music links when present. Missing links are explicitly unavailable. Music URLs are restricted to their provider hosts; no playback API or OAuth music scope is used.
+
+`next_unrated_track(p_season)` selects one active season track absent from the authenticated member’s votes. Ordering is ascending `md5(user_uuid || ':' || season_uuid || ':' || track_uuid)`, then track UUID. This is a stable distribution key, not a security primitive. Different users can receive different orders. Catalog additions enter this ordering naturally; existing votes are never reset. Null means caught up with the current catalog, including an empty catalog. There is no cursor/index or permanent completion flag.
+
+PASS / LIKE / SUPER LIKE all use the unchanged `cast_vote` contract: expected version 0, a new client UUID, and a version-1 receipt. Buttons block while pending. The next track is loaded only after a matching accepted receipt; progress and remaining Super Likes come from `my_progress` via the existing home API, never a client counter. Home reloads persisted progress when revisited.
+
+Before sending a vote, the browser writes its full action payload and display metadata to localStorage under a versioned user/season/action key. Separate action keys avoid overwriting another tab’s uncertain action. Reload/reopen discovers outstanding actions before asking for a new choice. Retry uses the same UUID, choice, track, season, and expected version; it can recover an accepted vote after locking. The request uses the captured user’s token and refuses a different current account. A 30-second request timeout is treated as uncertain, not rejected. No access token is stored in the retry journal. Pending choices remain locally across sign-out so the same account can recover; another account does not load them. Browser storage must be enabled. Clearing site storage discards pending retry metadata, but committed votes remain in Postgres and are excluded from the next-track queue.
+
+Network/unknown errors retain the pending action and show Retry pending vote. Definitive version/action conflicts, allowance errors, inactive tracks, closed voting, and lost membership show friendly messages and refresh authoritative state. The screen never upgrades expected_version to edit an existing vote. A different-device first vote is preserved. If receipt reconciliation succeeds but the next read fails, retry reloads the queue without sending another vote. Corrupt/unavailable local storage blocks new submissions rather than silently dropping an uncertain action. Cross-device and simultaneous-tab races are ultimately resolved by the database version/idempotency contract; no browser lock is treated as authority.
+
+No existing vote edits, gestures, results, scores, provider import, or admin UI are included.
+
+### Local development catalog
+
+The optional script adds 12 fictional tracks with `[DEV]` titles and artist names to an existing local season. It calls `add_track` and optionally the audited `transition_season` RPC. Re-running skips the same development titles in that season. It never deletes tracks/votes or runs automatically in migrations, production, or the frontend. It only connects to the existing local CLI project on loopback port 54322 and refuses libpq routing overrides, non-admin users, or closed seasons. Fictional tracks have no invented provider URLs; the normal placeholder and missing-link UI apply.
+
+With Docker/Supabase running, from the repository root:
+
+```sh
+SUPABASE_TELEMETRY_DISABLED=1 supabase migration up --local
+.venv/bin/python scripts/seed-dev-catalog.py \
+  --season YOUR_EXISTING_SEASON_UUID \
+  --admin-email YOUR_SIGNED_IN_ADMIN_GOOGLE_EMAIL \
+  --open-voting
+npm run dev
+```
+
+`--open-voting` explicitly advances SETUP to VOTING; omit it to leave the season in SETUP. Existing VOTING seasons stay open. The script uses the existing Python/psycopg environment from database setup. No real Google account is created by this script. Open the season, press Start rating, submit each choice, reload, and check Home. To exercise missing-response recovery, interrupt connectivity during a request and use Retry pending vote. Previously accepted actions reconcile safely.
+
+For destructive migration reset/integration tests, use a disposable stack with the five synthetic Auth users. Do not reset a local project containing real accounts merely to run tests. The first voting verification used an ignored copy of config/migrations/seed/tests under `.tools/voting-verification`, project ID `hardstyle-rankings-voting-check`, API port 55421, database port 55422, shadow port 55420, and Google disabled. The copied tests derive their CLI root there, keeping the existing non-local/non-synthetic guards intact. No credentials or real data were copied. A separate frontend on port 3001 exercised that stack. Apply migrations to the ordinary local project using `migration up --local`, preserving its accounts and data.
+
+Voting verification: **37 frontend tests** passed, with typecheck, ESLint, and production build passing. The isolated clean reset applied all five migrations; database lint found no schema errors; **39 database/API tests** passed (34 direct-database tests and 5 real PostgREST HTTP tests). A real Chrome/browser-to-Data-API run verified all three choices, an accepted response deliberately lost before delivery, reload plus same-action retry, persisted completion after refresh, updated Home progress, and mobile layout without horizontal overflow or runtime errors. Three choices produced exactly three current votes and three audit events, all at version 1. The development catalog loader added 12 tracks to the ordinary local season and zero on rerun. Existing local Google accounts/membership were preserved; the season was opened via the audited transition RPC.
+
+## Core voting milestone verification (2026-10-06)
+
+Before tagging `v0.1.0-core-voting`, all 37 frontend tests and 39 database/API tests passed again. TypeScript, ESLint, production build, database lint, documentation links, Python/shell syntax, and whitespace checks passed. The isolated local stack was cleanly rebuilt from all five migrations, with Studio on port 55423 and Google disabled for synthetic tests; the ordinary local database was not reset. Local credential files, Studio snippets, runtimes, and test artifacts remain ignored. No new product features were added during milestone preparation.
