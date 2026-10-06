@@ -30,7 +30,7 @@ enabled = false
 enabled = false
 
 [studio]
-enabled = false
+enabled = true
 
 [local_smtp]
 enabled = false
@@ -41,7 +41,7 @@ enabled = false
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = []
+additional_redirect_urls = ["http://127.0.0.1:3000/auth/callback"]
 jwt_expiry = 3600
 enable_signup = true
 enable_anonymous_sign_ins = false
@@ -53,10 +53,10 @@ enable_signup = false
 [auth.sms]
 enable_signup = false
 
-# Enable locally only when testing real OAuth with your own Google credentials.
+# Google credentials are loaded from the ignored repository-root .env file.
 # Database fixtures do not require an OAuth application or external account.
 [auth.external.google]
-enabled = false
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 skip_nonce_check = false

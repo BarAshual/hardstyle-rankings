@@ -215,6 +215,25 @@ class Foundation(unittest.TestCase):
                     self.assertTrue(c.execute("select has_table_privilege(%s,'public.test_unrelated_grants',%s)", (role, privilege)).fetchone()[0])
                 self.assertTrue(c.execute("select has_function_privilege(%s,'public.test_unrelated_rpc()','EXECUTE')", (role,)).fetchone()[0])
 
+    def test_invitation_inspection_is_private_read_only_and_member_aware(self):
+        inv=call(ADMIN,'invite_member',self.sid,'fixture4@example.invalid')
+        preview=call(OUTSIDER,'inspect_invitation',inv)
+        self.assertEqual(preview['season_id'],str(self.sid))
+        self.assertIsNone(preview['nickname'])
+        self.assertEqual(set(preview),{'season_id','season_name','year','nickname'})
+        self.assertEqual(self.owner_scalar('select count(*) from public.season_members where season_id=%s and user_id=%s',(self.sid,OUTSIDER)),0)
+        self.error('invitation_not_available',call,MEMBER,'inspect_invitation',inv)
+        self.error('invitation_not_available',call,OUTSIDER,'inspect_invitation',uuid.uuid4())
+        self.error('verified_google_identity_required',call,UNVERIFIED,'inspect_invitation',inv)
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+            with connect(role='anon') as c: rpc(c,'inspect_invitation',inv)
+        call(OUTSIDER,'accept_invitation',inv,'Returning raver')
+        self.assertEqual(call(OUTSIDER,'inspect_invitation',inv)['nickname'],'Returning raver')
+        with rollback_connection() as c:
+            c.execute('update public.season_invitations set accepted_by=%s where id=%s',(ADMIN,inv))
+            assume_user(c,OUTSIDER)
+            self.error('invitation_not_available',savepoint_rpc,c,'inspect_invitation',inv)
+
     def test_direct_writes_denied(self):
         self.vote()
         statements = [

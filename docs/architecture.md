@@ -2,7 +2,7 @@
 
 ## Accepted Architecture Baseline
 
-This baseline is implemented by the database foundation; see [database-foundation.md](database-foundation.md) for contracts and verification. Use a mobile-first responsive web client, Supabase Auth with Google, and Supabase/Postgres for persistent data. GitHub is the source of truth; database migrations belong in source control. The web framework, hosting provider, and import tooling are not selected.
+This baseline is implemented by the database foundation; see [database-foundation.md](database-foundation.md) for contracts and verification. Use a mobile-first responsive web client, Supabase Auth with Google, and Supabase/Postgres for persistent data. GitHub is the source of truth; database migrations belong in source control. The frontend uses Vite, React, TypeScript, React Router, and supabase-js; hosting and import tooling remain unselected. See [frontend.md](frontend.md) for OAuth and browser recovery behavior.
 
 Keep the system simple enough for one developer. Prefer database constraints and narrowly scoped transactional operations over additional services. AI-authored database and security changes must remain explicit and reviewable.
 
@@ -44,11 +44,11 @@ The implementation binds UUIDs to the authenticated actor across seasons, serial
 
 Treat the database as authoritative. Retain the action UUID and payload across retries and reconcile uncertain outcomes before reporting a durable success. Distinguish pending actions from confirmed votes and recover from lost responses without asking users to rerate.
 
-Select the next track by excluding current votes from the current active season catalog, including tracks added after voting began. Eventually apply stable pseudo-random ordering per user/season with a deterministic tie-breaker. The seed and algorithm remain to be selected. Derive completion and Super Like usage from persisted data; do not store mutable progress indexes or usage counters.
+Select the next track by excluding current votes from the current active season catalog, including tracks added after voting began. The read-only `next_unrated_track` RPC orders by MD5 of user/season/track UUIDs with a track UUID tie-breaker. It returns only the caller’s next active unvoted track metadata. Derive completion and Super Like usage from persisted data; do not store mutable progress indexes or usage counters.
 
 ## Verification Priorities
 
-The database suite tests duplicate requests, UUID/payload conflicts, concurrent Super Likes, transaction rollback, audit atomicity, lost-response recovery, and locking races. It exercises both SQL roles and the actual local Data API, including admin secrecy and audit access. Browser reconnect/reload UX remains future frontend work. See database-foundation.md for test commands and results.
+The database suite tests duplicate requests, UUID/payload conflicts, concurrent Super Likes, transaction rollback, audit atomicity, lost-response recovery, and locking races. It exercises both SQL roles and the actual local Data API, including admin secrecy and audit access. The browser persists pending actions per user/season/action and replays identical payloads after uncertain responses or reload; frontend and real browser/API tests cover this recovery. See database-foundation.md for test commands and results.
 
 ## Recovery Planning
 

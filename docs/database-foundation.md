@@ -2,7 +2,7 @@
 
 ## Status and boundaries
 
-Implemented source-data foundation using Supabase/Postgres 17. There is no frontend, scoring, results, music-provider integration, email delivery, or reveal presentation. The source migrations are authoritative for schema and function signatures. Accepted product/architecture decisions are in [decisions.md](decisions.md).
+Implemented source-data foundation using Supabase/Postgres 17. Scoring, results, music-provider integration, email delivery, and reveal presentation remain deferred. The first frontend slice is documented in [frontend.md](frontend.md). The source migrations are authoritative for schema and function signatures. Accepted product/architecture decisions are in [decisions.md](decisions.md).
 
 The implementation uses one season row lock to serialize writes for a season. This intentionally favors simple correctness over throughput for approximately 15 friends. No mutable Super Like usage counter, permanent completion flag, synchronization service, or result snapshot exists.
 
@@ -33,6 +33,8 @@ Python dependencies are pinned in `tests/requirements.txt`. A normal `.venv` is 
 | `20261001000100_core.sql` | Seasons, membership, invitations, tracks, artists/credits, catalog, current votes, immutable vote/configuration/lifecycle events, keys/checks/indexes, deferred audit consistency, initial deny-by-default grants/RLS. |
 | `20261001000200_api.sql` | Trusted identity helpers and secured transactional mutation and progress RPCs. |
 | `20261001000300_security.sql` | Explicit select policies and execute grants/revocations for named application objects; unrelated public objects/default privileges are untouched. |
+| `20261003000200_next_unrated_track.sql` | Additive read-only member queue, excluding own votes and returning track metadata in deterministic per-user order. |
+| `20261003000100_invitation_preview.sql` | Additive read-only invitation inspection, authorized for the matching verified Google identity only; supports existing-member bypass and nickname onboarding. |
 
 All foreign keys that protect voting history restrict deletion. Catalog rows have an `active` flag, but the foundation exposes addition only. No role-promotion, membership-removal, track deactivation/deletion, vote deletion, or audit rewrite API is provided. Provider metadata columns may remain null. Artist names are not assumed globally unique; manual input does not perform deduplication.
 
@@ -44,7 +46,9 @@ RPC names and parameters below match SQL/PostgREST. Every caller's user ID comes
 | --- | --- |
 | `create_season(p_name, p_year, p_allowance, p_nickname)` | Verified Google identity creates a SETUP season and becomes its first admin atomically; returns season UUID. Explicit nonnegative allowance is required. |
 | `invite_member(p_season, p_email)` | Season admin creates an invitation with trimmed/lowercase email; returns its UUID. Repeating the same normalized season/email returns the existing invitation. No delivery occurs. |
+| `inspect_invitation(p_invitation)` | Verified invited Google identity only; returns season ID/name/year and own existing nickname or null, without creating membership. |
 | `accept_invitation(p_invitation, p_nickname)` | Validates trusted verified Google email; creates member and binds acceptance to authenticated user atomically. Same-user retry returns the season UUID without changing nickname. Wrong identity and unknown UUID return the same denial. |
+| `next_unrated_track(p_season)` | Member-only; returns one active unvoted track with ordered artists/artwork/provider links, or null. Stable per-user MD5 ordering and UUID tie-breaker; no other users’ votes or mutable queue state. |
 | `add_track(p_season, p_title, p_artists)` | Admin adds a new track with ordered artist credits in SETUP/VOTING. Returns track UUID; no import, matching, or deduplication. |
 | `add_existing_track(p_season, p_track)` | Admin adds an existing track visible through one of their memberships. Re-adding the same catalog association is harmless. |
 | `transition_season(p_season, p_state)` | Admin advances exactly SETUP → VOTING → LOCKED → REVEAL. Records actor, old/new state, and timestamp atomically. |
@@ -57,7 +61,7 @@ Nickname must be nonblank and at most 80 characters; uniqueness is not required.
 
 Invitation ID is a locator, not sufficient authorization. Auth-managed `auth.identities` must contain a Google identity with boolean `email_verified: true`; its normalized email must match confirmed `auth.users.email` and the invitation. User-editable `raw_user_meta_data` is ignored. A shared `private.normalize_email(text)` helper lowercases after stripping only surrounding POSIX whitespace (including spaces, tabs, and newlines); the invitation CHECK constraint uses it too. Internal whitespace, Gmail dots, and plus aliases are preserved. Acceptance stays tied to `auth.users.id`; account switching is deferred. The creator bootstrap is the deliberate exception to invitation-based membership. Any verified Google user can create their own isolated season; that creates no authority over existing seasons.
 
-The config disables email/SMS signup, anonymous accounts, and manual identity linking. Google OAuth is disabled locally until real credentials are supplied using environment references and the provider is enabled. Before real-user deployment, enable/configure Google and verify provider claim behavior end to end. Never enable a second identity path casually: admission relies on the trusted Auth identity boundary.
+The config disables email/SMS signup, anonymous accounts, and manual identity linking. Google OAuth is enabled locally; both credentials are loaded through environment references from ignored root `.env`. Before real-user deployment, enable/configure Google and verify provider claim behavior end to end. Never enable a second identity path casually: admission relies on the trusted Auth identity boundary.
 
 ## Voting and recovery contract
 
@@ -84,7 +88,7 @@ Members see their seasons/catalog metadata, their membership, their own current 
 
 Security-definer functions pin an empty search path and fully qualify table/helper references. Private helpers are outside the exposed API schema; only boolean membership/admin helpers receive authenticated execute privileges for policies. Mutating functions recheck authority. Privileged owner/service access remains an explicit trust boundary; it is not an application admin role. Audit update/delete/truncate triggers add protection against accidental privileged rewrites, but the database owner can intentionally alter schema and bypass them.
 
-The Data API exposes only `public`. Realtime, GraphQL exposure, storage, studio, edge functions, analytics, and SMTP are unnecessary for this foundation and disabled locally. No preference table is published to Realtime. Future changes to grants, definer functions, logs, exports, or result endpoints require equivalent secrecy review.
+The Data API exposes only `public`. Realtime, GraphQL exposure, storage, edge functions, analytics, and SMTP are unnecessary for this foundation and disabled locally. Local Supabase Studio is enabled for owner-operated development inspection; its scratch queries under `supabase/snippets/` are ignored and never deployed as migrations. No preference table is published to Realtime. Future changes to grants, definer functions, logs, exports, or result endpoints require equivalent secrecy review.
 
 ## Verification and remaining work
 

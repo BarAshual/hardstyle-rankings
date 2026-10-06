@@ -21,7 +21,7 @@ This repository defines a private annual Hardstyle ranking app for approximately
 
 ## Development and Validation
 
-The database foundation uses versioned Supabase migrations and Python database integration tests. Follow docs/database-foundation.md for setup, reset, and test commands. No application or typecheck tooling is configured. Keep migrations in source control.
+The database foundation uses versioned Supabase migrations and Python database integration tests. Follow docs/database-foundation.md for setup, reset, and test commands. The frontend uses Vite/React/TypeScript; follow docs/frontend.md. Run npm test, npm run typecheck, npm run lint, and npm run build for frontend work; rerun database integration tests for database contract changes. Keep migrations in source control.
 
 After modifications, run relevant tests and typechecks when available. For database work, verify authorization, secrecy, constraints, concurrency, retries, and audit behavior. Report checks performed and anything unavailable. Review documentation links and whitespace for documentation changes.
 
