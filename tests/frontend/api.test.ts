@@ -5,12 +5,14 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   rpc: vi.fn(),
   session: vi.fn(),
+  from: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.create }));
 import { createAPI, friendlyError, nicknameError } from "../../src/api";
 beforeEach(() => {
   mocks.create.mockReturnValue({
     rpc: mocks.rpc,
+    from: mocks.from,
     auth: {
       exchangeCodeForSession: mocks.exchange,
       signInWithOAuth: mocks.oauth,
@@ -109,4 +111,51 @@ it("sends the exact first-vote payload with the captured actor token", async () 
   });
   await expect(api.castVote(action)).rejects.toThrow("authentication_required");
   expect(mocks.rpc).toHaveBeenCalledOnce();
+});
+
+it("reads every page of own picks with ordered credits and a stable cursor", async () => {
+  const row = (n: number) => ({
+    track_id: `track-${n}`,
+    choice: "LIKE",
+    version: 4,
+    catalog: {
+      active: true,
+      track: {
+        id: `track-${n}`,
+        title: "Fixture",
+        artwork_url: null,
+        spotify_url: null,
+        apple_music_url: null,
+        credits: [
+          { credit_order: 1, artist: { name: "Second" } },
+          { credit_order: 0, artist: { name: "First" } },
+        ],
+      },
+    },
+  });
+  let page = 0;
+  const pages = [Array.from({ length: 500 }, (_, i) => row(i)), [row(500)]];
+  const query = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    gt: vi.fn().mockReturnThis(),
+    then: (resolve: (value: unknown) => void) =>
+      Promise.resolve({ data: pages[page++], error: null }).then(resolve),
+  };
+  mocks.from.mockReturnValue(query);
+  const result = await createAPI(
+    "http://127.0.0.1:54321",
+    "sb_publishable_test",
+  ).myPicks("season", "actor");
+  expect(mocks.from).toHaveBeenCalledWith("votes");
+  expect(query.eq).toHaveBeenCalledWith("season_id", "season");
+  expect(query.eq).toHaveBeenCalledWith("user_id", "actor");
+  expect(query.gt).toHaveBeenCalledWith("track_id", "track-499");
+  expect(result).toHaveLength(501);
+  expect(result[500]).toMatchObject({
+    version: 4,
+    artists: ["First", "Second"],
+  });
 });

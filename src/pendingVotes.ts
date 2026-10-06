@@ -1,4 +1,4 @@
-import { uuidPattern, type Track, type VoteAction } from "./api";
+import { uuidPattern, type Track, type API, type VoteAction } from "./api";
 
 export type PendingVote = { action: VoteAction; track: Track };
 const prefix = "hardstyle.vote.v1:";
@@ -26,7 +26,9 @@ export function readPending(user: string, season: string): PendingVote | null {
     a.season_id !== season ||
     !uuidPattern.test(a.action_id) ||
     !uuidPattern.test(a.track_id) ||
-    a.expected_version !== 0 ||
+    !Number.isInteger(a.expected_version) ||
+    a.expected_version < 0 ||
+    a.expected_version >= 2147483647 ||
     !["PASS", "LIKE", "SUPER_LIKE"].includes(a.choice) ||
     pending.track?.id !== a.track_id ||
     typeof pending.track.title !== "string" ||
@@ -36,4 +38,19 @@ export function readPending(user: string, season: string): PendingVote | null {
   )
     throw new Error("Invalid pending vote");
   return pending;
+}
+
+// Both rating and editing validate the same durable receipt, then remove only this action.
+export async function confirmPending(api: API, pending: PendingVote) {
+  const a = pending.action;
+  const receipt = await api.castVote(a);
+  if (
+    receipt.action_id !== a.action_id ||
+    receipt.season_id !== a.season_id ||
+    receipt.track_id !== a.track_id ||
+    receipt.choice !== a.choice ||
+    receipt.version !== a.expected_version + 1
+  )
+    throw new Error("Unexpected vote receipt");
+  removePending(a);
 }

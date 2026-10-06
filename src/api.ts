@@ -32,12 +32,13 @@ export type Track = {
   spotify_url: string | null;
   apple_music_url: string | null;
 };
+export type Pick = Track & { choice: Choice; version: number; active: boolean };
 export type VoteAction = {
   user_id: string;
   season_id: string;
   track_id: string;
   choice: Choice;
-  expected_version: 0;
+  expected_version: number;
   action_id: string;
 };
 export type VoteReceipt = {
@@ -49,6 +50,7 @@ export type VoteReceipt = {
   accepted_at: string;
 };
 export interface API {
+  myPicks(seasonId: string, userId: string): Promise<Pick[]>;
   nextTrack(seasonId: string): Promise<Track | null>;
   castVote(action: VoteAction): Promise<VoteReceipt>;
   restore(): Promise<Identity | null>;
@@ -77,6 +79,7 @@ export function errorCode(error: unknown): string {
     "message" in error &&
     typeof error.message === "string" &&
     [
+      "nickname_unavailable",
       "invitation_not_available",
       "verified_google_identity_required",
       "authentication_required",
@@ -95,8 +98,9 @@ export function friendlyError(error: unknown): string {
     case "PGRST301":
     case "PGRST303":
       return "Your session has expired. Please sign in again.";
+    case "nickname_unavailable":
     case "23505":
-      return "That rave name could not be saved. Please try another name.";
+      return "That rave name is already taken in this season. Please try another name.";
     case "23514":
       return "Check your rave name and try again. Use 1–80 characters.";
     default:
@@ -192,6 +196,54 @@ export function createAPI(url: string, key: string): API {
       });
       if (error) throw error;
       return data as string;
+    },
+    async myPicks(seasonId, userId) {
+      const picks: Pick[] = [];
+      let after: string | undefined;
+      // Keyset pagination avoids the Data API row cap, with RLS plus an explicit own-user filter.
+      for (;;) {
+        let query = client
+          .from("votes")
+          .select(
+            "track_id,choice,version,catalog:season_tracks!inner(active,track:tracks!inner(id,title,artwork_url,spotify_url,apple_music_url,credits:track_artists(credit_order,artist:artists(name))))",
+          )
+          .eq("season_id", seasonId)
+          .eq("user_id", userId)
+          .order("track_id")
+          .limit(500);
+        if (after) query = query.gt("track_id", after);
+        const { data, error } = await query;
+        if (error) throw error;
+        const rows = data as unknown as Array<{
+          track_id: string;
+          choice: Choice;
+          version: number;
+          catalog: {
+            active: boolean;
+            track: Omit<Track, "artists"> & {
+              credits: Array<{
+                credit_order: number;
+                artist: { name: string };
+              }>;
+            };
+          };
+        }>;
+        for (const row of rows) {
+          const { credits, ...track } = row.catalog.track;
+          picks.push({
+            ...track,
+            choice: row.choice,
+            version: row.version,
+            active: row.catalog.active,
+            artists: [...credits]
+              .sort((a, b) => a.credit_order - b.credit_order)
+              .map((c) => c.artist.name),
+          });
+        }
+        if (rows.length < 500) break;
+        after = rows[rows.length - 1].track_id;
+      }
+      return picks;
     },
     async nextTrack(seasonId) {
       const { data, error } = await client.rpc("next_unrated_track", {

@@ -140,3 +140,61 @@ class DataAPI(unittest.TestCase):
         call(ADMIN,'transition_season',self.sid,'LOCKED')
         self.assertEqual(self.request(MEMBER,'rpc/cast_vote',dict(payload,p_choice='PASS'))[1]['message'],'voting_closed')
         self.assertEqual(self.request(MEMBER,'rpc/next_unrated_track',body)[1]['id'],track['id'])
+
+    def test_http_my_picks_uses_own_rls_including_locked_and_reveal(self):
+        from urllib.parse import urlencode
+        columns='track_id,choice,version,catalog:season_tracks!inner(active,track:tracks!inner(id,title,artwork_url,spotify_url,apple_music_url,credits:track_artists(credit_order,artist:artists(name))))'
+        def path(user):
+            return 'votes?'+urlencode({'select':columns,'season_id':'eq.'+str(self.sid),'user_id':'eq.'+user,'order':'track_id.asc','limit':'500'})
+        self.assertEqual(self.request(MEMBER,'rpc/cast_vote',self.payload)[0],200)
+        for state in ('VOTING','LOCKED','REVEAL'):
+            if state!='VOTING': call(ADMIN,'transition_season',self.sid,state)
+            status,rows=self.request(MEMBER,path(MEMBER))
+            self.assertEqual(status,200,rows)
+            self.assertEqual(len(rows),1)
+            self.assertEqual(rows[0]['choice'],'SUPER_LIKE')
+            self.assertEqual(rows[0]['version'],1)
+            self.assertEqual(rows[0]['catalog']['track']['credits'][0]['artist']['name'],'Synthetic')
+            for other in (ADMIN,OUTSIDER):
+                self.assertEqual(self.request(other,path(MEMBER)),(200,[]))
+            self.assertIn(self.request(None,path(MEMBER))[0],(401,403))
+
+    def test_http_edit_lifecycle_allowance_conflicts_and_recovery(self):
+        first=dict(self.payload,p_choice='LIKE')
+        self.assertEqual(self.request(MEMBER,'rpc/cast_vote',first)[1]['version'],1)
+        extra=call(ADMIN,'add_track',self.sid,'Other track',['Other artist'])
+        version=1
+        for choice,available in [('PASS',1),('LIKE',1),('SUPER_LIKE',0),('LIKE',1)]:
+            payload=dict(first,p_choice=choice,p_expected_version=version,p_action=str(uuid.uuid4()))
+            status,receipt=self.request(MEMBER,'rpc/cast_vote',payload)
+            self.assertEqual(status,200,receipt)
+            self.assertEqual(receipt['version'],version+1)
+            self.assertEqual(self.request(MEMBER,'rpc/cast_vote',payload),(200,receipt))
+            progress=self.request(MEMBER,'rpc/my_progress',{'p_season':str(self.sid)})[1]
+            self.assertEqual(progress['super_likes_available'],available)
+            stale=dict(payload,p_action=str(uuid.uuid4()))
+            self.assertEqual(self.request(MEMBER,'rpc/cast_vote',stale)[1]['message'],'vote_version_conflict')
+            if choice=='SUPER_LIKE':
+                second=dict(self.payload,p_track=str(extra),p_action=str(uuid.uuid4()))
+                self.assertEqual(self.request(MEMBER,'rpc/cast_vote',second)[1]['message'],'super_like_limit')
+            version+=1
+        # The freed allowance can be consumed by another track.
+        second=dict(self.payload,p_track=str(extra),p_action=str(uuid.uuid4()))
+        self.assertEqual(self.request(MEMBER,'rpc/cast_vote',second)[0],200)
+        self.assertEqual(self.request(MEMBER,'rpc/cast_vote',dict(payload,p_choice='PASS'))[1]['message'],'action_payload_conflict')
+        call(ADMIN,'transition_season',self.sid,'LOCKED')
+        self.assertEqual(self.request(MEMBER,'rpc/cast_vote',payload),(200,receipt))
+        new_edit=dict(payload,p_expected_version=version,p_action=str(uuid.uuid4()))
+        self.assertEqual(self.request(MEMBER,'rpc/cast_vote',new_edit)[1]['message'],'voting_closed')
+        status,events=self.request(MEMBER,'vote_events?season_id=eq.'+str(self.sid))
+        self.assertEqual(status,200,events)
+        self.assertEqual(len(events),6) # first + four edits + second track, retries have no effect
+
+    def test_http_nickname_conflict_is_friendly_and_atomic(self):
+        inv=call(ADMIN,'invite_member',self.sid,'fixture4@example.invalid')
+        status,result=self.request(OUTSIDER,'rpc/accept_invitation',{'p_invitation':str(inv),'p_nickname':'mEmBeR'})
+        self.assertEqual(status,409,result)
+        self.assertEqual(result['message'],'nickname_unavailable')
+        self.assertIsNone(result['details'])
+        self.assertEqual(self.request(OUTSIDER,'season_members?season_id=eq.'+str(self.sid)),(200,[]))
+        self.assertIsNone(self.request(OUTSIDER,'rpc/inspect_invitation',{'p_invitation':str(inv)})[1]['nickname'])

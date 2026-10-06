@@ -1,6 +1,6 @@
 # Hardstyle Rankings
 
-Private annual ranking for a small group of friends. The database foundation uses Supabase Auth and PostgreSQL; the first frontend slice supports Google sign-in, invitation/nickname onboarding, and personal season progress. Result calculation is not implemented.
+Private annual ranking for a small group of friends. The database foundation uses Supabase Auth and PostgreSQL; the frontend supports Google sign-in, invitation onboarding with season-unique nicknames, personal progress, durable first votes, and My Picks search/filter/editing. Result calculation is not implemented.
 
 For browser setup and exact OAuth configuration, read [Frontend setup](docs/frontend.md).
 

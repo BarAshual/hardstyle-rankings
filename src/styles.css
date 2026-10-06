@@ -392,3 +392,67 @@ footer {
     max-width: 280px;
   }
 }
+
+.picks-controls {
+  margin: 24px 0;
+}
+.picks-controls label {
+  margin-top: 14px;
+}
+select {
+  font: inherit;
+  width: 100%;
+  padding: 12px;
+  color: inherit;
+  background: #19191d;
+  border: 1px solid #77777e;
+  border-radius: 4px;
+  min-height: 48px;
+}
+select:focus-visible {
+  outline: 3px solid #dfef72;
+  outline-offset: 4px;
+}
+.picks-list {
+  list-style: none;
+  padding: 0;
+}
+.pick-card {
+  border-top: 1px solid #38383e;
+  padding: 24px 0;
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 18px;
+}
+.pick-card .track-art {
+  width: 80px;
+  margin: 0;
+  font-size: 14px;
+  gap: 4px;
+}
+.pick-card h2 {
+  overflow-wrap: anywhere;
+}
+.pick-card p {
+  font-size: 14px;
+}
+.pick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pick-actions button {
+  padding: 10px;
+  font-size: 12px;
+}
+.pick-actions button[aria-pressed="true"] {
+  border-color: #d8ee69;
+  color: #d8ee69;
+  opacity: 1;
+  cursor: default;
+}
+@media (max-width: 380px) {
+  .pick-card {
+    grid-template-columns: 1fr;
+  }
+}
