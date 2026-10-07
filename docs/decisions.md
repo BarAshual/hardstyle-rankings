@@ -104,3 +104,24 @@ The personal queue uses MD5 of colon-separated user/season/track UUIDs and a tra
 My Picks uses existing RLS table reads and the existing cast_vote RPC. Search/filter stays in the browser; pagination uses track UUIDs. A same-choice selection is a UI no-op. A stale edit reloads the current vote and waits for a new user decision. The shared pending journal accepts nonnegative integer expected versions and remains compatible with existing version-0 records. Raw votes remain private in LOCKED and REVEAL.
 
 GitHub Actions runs a minimal frontend job and a separate local Supabase integration job on disposable Ubuntu runners, with pinned actions/tool versions and no project/OAuth secrets. No new external service or deployment pipeline is introduced.
+
+## Accepted catalog ingestion decisions (2026-10-07)
+
+These decisions supersede the initial catalog design proposals. See [catalog-ingestion.md](catalog-ingestion.md) for details; no importer or migration is implemented by this record.
+
+| ID | Type | Accepted decision | Rationale |
+| --- | --- | --- | --- |
+| D29 | Product | A season may designate one primary Spotify playlist initially; support other sources later without Spotify-coupled canonical storage. | Start simply and preserve provider independence. |
+| D30 | Architecture | Permanent internal UUIDs identify canonical tracks and artists; external provider IDs are mappings only. | Metadata/provider changes must not change vote targets. |
+| D31 | Product | Different released versions MUST be separate canonical tracks, including remixes, edits, extended/radio mixes, distinct released bootlegs, VIPs, acoustic/live/reworks and other variants. Metadata similarity or shared ISRC cannot collapse them. | Wrong merges are more damaging than duplicate records. |
+| D32 | Product | Release-year mismatch is a visible review warning, not automatic exclusion/rejection; admin may explicitly include the item. | Provider dates can describe compilations, re-releases or other contexts. |
+| D33 | Product | Default Spotify ingestion market is `IL`, configurable at the season/ingestion boundary. | Predictable availability without coupling identity to market. |
+| D34 | Integrity | If either suspected duplicate has vote history, retain both tracks: no automatic merge/delete, vote movement, history/event rewrite, or silent deactivation. Flag for explicit review. | Historical voting integrity takes priority over catalog cleanup. |
+| D35 | Architecture | Exact known provider identities reuse accepted mappings and canonical records. New match candidates require review or separate identity; ISRC/title/artists/duration are not automatic equivalence. | Safe idempotency without destructive inference. |
+| D36 | Integrity | Reimports create no duplicate records for the same provider identity or season membership. Additions during VOTING preserve every vote/event and naturally reopen derived unrated work. | Reliable growth and retries. |
+
+### Implementation recommendations, not accepted product rules
+
+Use private provider mappings, source configuration, minimal import/run-item persistence, explicit grants, and a bounded local/admin CLI with dry-run/apply. Recommend operator OAuth with PKCE for accessible owned/collaborative playlists, reviewed year-inclusion evidence, conservative metadata refresh, and provider artwork URLs with fallback. Exact table shapes and operational defaults are proposals for implementation review. No integration, migration, CLI, OAuth, UI, scoring, or results is implemented in this design task.
+
+No product-policy questions block the first importer. The actual designated playlist and permitted operator access are run-time configuration prerequisites. Future destructive reconciliation remains deferred and does not block preservation/reporting. No new tag or main merge accompanies this design commit.
