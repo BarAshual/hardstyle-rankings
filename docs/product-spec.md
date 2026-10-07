@@ -60,3 +60,13 @@ After `REVEAL`, admins should eventually control which result and insight catego
 Canonical recordings and artists retain permanent internal UUIDs; provider IDs are mappings. Distinct released musical versions MUST be separate canonical tracks, including originals, remixes, edits, extended/radio mixes, distinct released bootlegs, VIPs, live/acoustic/reworks, and other variants. Title/artist/duration/album similarities or shared ISRC cannot automatically establish equivalence. Exact accepted provider mappings are reused on reimport; uncertain matches require review or separate records.
 
 Release-year mismatches are flagged for review, never silently excluded or automatically rejected; an admin can explicitly include them. Spotify market defaults to `IL` and remains configurable at the ingestion/season boundary. Repeat imports preserve votes/events and avoid duplicate known provider identities and memberships. See [catalog-ingestion.md](catalog-ingestion.md) for the separate implementation recommendations; no importer is implemented yet.
+
+## Accepted catalog admission refinement (2026-10-07)
+
+Clean, unambiguous candidates from the designated playlist are admitted automatically after validation/identity checks. Only exceptions require explicit review: year mismatch, suspected duplicate/match, material identity inconsistency, or insufficient identifying metadata. Suspected duplicates are neither automatically admitted nor merged; an admin may admit a distinct recording, safely resolve its mapping, or defer/decline it without access to group voting preferences.
+
+Admission is allowed only in SETUP/VOTING, never LOCKED/REVEAL. The playlist is additive: disappearance does not remove, deactivate, delete, or alter votes. An admin may replace the designated playlist through an audited change during SETUP/VOTING, affecting future imports only and preserving all admitted tracks. IL playback restrictions are flagged but do not determine eligibility; identifiable recordings follow normal admission/review rules.
+
+Future audited admin withdrawal of an admitted mistake is allowed only in SETUP/VOTING. Preserve canonical identity, season association, votes, and audit history; stop new voting, exclude the track from eventual scoring/results, and retain personal historical views with withdrawn/ineligible status. Normal withdrawal after locking is forbidden; exceptional post-lock correction remains deferred. This behavior is not implemented yet.
+
+Clearly non-identity-changing provider URLs, artwork, availability, and album/release observations may refresh automatically. Material title, artist-credit identity, or version/remix changes require review; refresh never changes the canonical recording referenced by votes.

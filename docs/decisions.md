@@ -125,3 +125,20 @@ These decisions supersede the initial catalog design proposals. See [catalog-ing
 Use private provider mappings, source configuration, minimal import/run-item persistence, explicit grants, and a bounded local/admin CLI with dry-run/apply. Recommend operator OAuth with PKCE for accessible owned/collaborative playlists, reviewed year-inclusion evidence, conservative metadata refresh, and provider artwork URLs with fallback. Exact table shapes and operational defaults are proposals for implementation review. No integration, migration, CLI, OAuth, UI, scoring, or results is implemented in this design task.
 
 No product-policy questions block the first importer. The actual designated playlist and permitted operator access are run-time configuration prerequisites. Future destructive reconciliation remains deferred and does not block preservation/reporting. No new tag or main merge accompanies this design commit.
+
+## Accepted catalog admission refinement (2026-10-07)
+
+These refine the preceding design; implementation remains deferred.
+
+| ID | Accepted product decision |
+| --- | --- |
+| D37 | Automatically admit clean, unambiguous designated-playlist candidates after validation/identity checks; no per-track approval. Hold year mismatches, suspected matches, material identity inconsistencies, and insufficient identifying metadata for explicit review. |
+| D38 | Admit new season tracks only in SETUP/VOTING, never LOCKED/REVEAL. |
+| D39 | Playlist removal is non-destructive: no automatic removal, deactivation, deletion, or vote change. |
+| D40 | Future explicit audited admin withdrawal is allowed only in SETUP/VOTING. Preserve canonical tracks, season associations, votes and events; stop new voting, exclude eventual scoring/results, and retain personal history marked withdrawn/ineligible. Exceptional post-lock correction remains future policy. |
+| D41 | Suspected duplicates block automatic admission and merging. Review may admit a distinct recording, safely resolve a provider mapping, or defer/decline; it must not expose pre-REVEAL group preferences or weaken existing raw-vote privacy. |
+| D42 | IL playback availability is not season eligibility. Flag restrictions; identifiable recordings follow ordinary automatic/review admission rules. |
+| D43 | An admin may replace the designated playlist through an audited change in SETUP/VOTING; record the change, affect future imports only, and preserve already-admitted tracks. |
+| D44 | Clearly non-identity-changing provider URL/artwork/availability/album/release observations may refresh automatically; material title, artist-credit identity, or version/remix changes require review. Never silently change a voted recording. |
+
+Audited withdrawal is distinct from the automatic deactivation prohibited by D34. It is accepted future behavior, not a new importer feature in this documentation task. No genuine product decision blocks the first importer; storage and workflow details remain engineering recommendations.
