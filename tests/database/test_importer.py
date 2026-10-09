@@ -66,7 +66,8 @@ class Importer(unittest.TestCase):
         call(MEMBER,'accept_invitation',inv,'Member')
         call(ADMIN,'transition_season',self.sid,'VOTING')
         candidates=[self.c(n) for n in range(850)]
-        first=self.plan(candidates)
+        started=time.perf_counter(); first=self.plan(candidates)
+        print('\n850 first plan: %.3fs' % (time.perf_counter()-started),flush=True)
         receipts=[self.apply(first,n) for n in range(850)]
         self.assertEqual(sum(r['outcome']=='added' for r in receipts),850)
         tid=receipts[0]['track_id']
@@ -74,7 +75,8 @@ class Importer(unittest.TestCase):
         before_votes=self.scalar('select jsonb_agg(to_jsonb(v)) from public.votes v where season_id=%s',(self.sid,))
         before=self.scalar('select jsonb_agg(to_jsonb(v)) from public.vote_events v where season_id=%s',(self.sid,))
         for total, expected in ((850,0),(875,25)):
-            p=self.plan([self.c(n) for n in range(total)])
+            started=time.perf_counter(); p=self.plan([self.c(n) for n in range(total)])
+            print('%d repeat/growth plan: %.3fs' % (total,time.perf_counter()-started),flush=True)
             rows=[self.apply(p,n) for n in range(total)]
             self.assertEqual(sum(r['outcome']=='added' for r in rows),expected)
             self.assertEqual(sum(r['new_track'] for r in rows),expected)
@@ -332,6 +334,32 @@ class Importer(unittest.TestCase):
         external=self.c(3,artists=[{'id':identifier(self.base+3000000),'name':left['artists'][0]['name']}])
         q=self.plan([external]); self.review(q); self.apply(q)
         self.assertEqual(self.apply(p),{'outcome':'review-required','reason':'evidence_changed'})
+
+    def test_planning_optimization_preserves_exact_evidence(self):
+        # Compare complete JSON against the applied version-3 helper, including
+        # ordering, duplicate occurrences, artist-only and track-only peers.
+        left,right=self.artist_pair()
+        known=self.c(20); self.apply(self.plan([known]))
+        external=self.c(21,title=left['title'],isrc=left['isrc'],artists=left['artists']); self.apply(self.plan([external]))
+        candidates=[left,right,dict(right),self.c(3,title=left['title']),
+                    self.c(4,isrc=left['isrc']),self.c(5,artists=left['artists']),
+                    self.c(6,artists=[{'id':identifier(self.base+6000000),
+                                      'name':'  '+left['artists'][0]['name'].upper()+'  '}]),
+                    known,self.c(7,original_id=external['id']),{'kind':'invalid'},{'kind':'skipped'}]
+        p=self.plan(candidates)
+        migration=(Path(__file__).resolve().parents[2]/'supabase/migrations/20261008000200_import_artist_evidence.sql').read_text()
+        original=migration.split('create or replace function private.import_plan_evidence',1)[1].split('create or replace function private.import_review_evidence_matches',1)[0]
+        catalog=migration.split('create or replace function private.import_evidence',1)[1].split('create or replace function private.import_plan_evidence',1)[0]
+        original=original.replace('private.import_evidence(', 'private.import_evidence_reference(')
+        with rollback_connection() as c:
+            c.execute('create function private.import_evidence_reference'+catalog)
+            c.execute('create function private.import_plan_evidence_reference'+original)
+            rows=c.execute("select position, private.import_plan_evidence(%s,run_id,position,candidate), private.import_plan_evidence_reference(%s,run_id,position,candidate), artist_name_keys, private.import_artist_names(candidate) from private.import_items where run_id=%s order by position",(self.sid,self.sid,p['run'])).fetchall()
+            for position,actual,expected,stored,names in rows:
+                self.assertEqual(actual,expected,position)
+                self.assertEqual(stored,names,position)
+            c.execute("update private.import_items set candidate=jsonb_set(candidate,'{artists}',%s) where run_id=%s and position=0",(Jsonb(self.c(40)['artists']),p['run']))
+            self.assertTrue(c.execute('select artist_name_keys=private.import_artist_names(candidate) from private.import_items where run_id=%s and position=0',(p['run'],)).fetchone()[0])
 
     def test_artist_staging_index_handles_nonrecordings(self):
         for artists in (None,{},42):
