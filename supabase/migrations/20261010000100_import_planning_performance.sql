@@ -89,4 +89,3 @@ begin
  end if;
  return jsonb_build_object('evidence_version',3,'same_run_peers','[]'::jsonb,'same_run_artist_peers','[]'::jsonb,'artist_matches',artist_matches,'match_catalog',coalesce((select jsonb_agg(private.import_catalog_evidence(t.id) order by t.id) from jsonb_array_elements_text(matches) matched_id(id) join public.tracks t on t.id=matched_id.id::uuid),'[]'::jsonb),'reasons',reasons,'matches',matches,'identity',private.import_identity(c),'release_date',c->'release_date','release_precision',c->'release_precision','known_track',m.track_id,'accepted_identity',m.identity);
 end $$;
-
