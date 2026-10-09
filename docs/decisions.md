@@ -142,3 +142,7 @@ These refine the preceding design; implementation remains deferred.
 | D44 | Clearly non-identity-changing provider URL/artwork/availability/album/release observations may refresh automatically; material title, artist-credit identity, or version/remix changes require review. Never silently change a voted recording. |
 
 Audited withdrawal is distinct from the automatic deactivation prohibited by D34. It is accepted future behavior, not a new importer feature in this documentation task. No genuine product decision blocks the first importer; storage and workflow details remain engineering recommendations.
+
+## First importer implementation (2026-10-07)
+
+The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.

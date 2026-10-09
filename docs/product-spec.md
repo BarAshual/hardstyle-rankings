@@ -59,7 +59,7 @@ After `REVEAL`, admins should eventually control which result and insight catego
 
 Canonical recordings and artists retain permanent internal UUIDs; provider IDs are mappings. Distinct released musical versions MUST be separate canonical tracks, including originals, remixes, edits, extended/radio mixes, distinct released bootlegs, VIPs, live/acoustic/reworks, and other variants. Title/artist/duration/album similarities or shared ISRC cannot automatically establish equivalence. Exact accepted provider mappings are reused on reimport; uncertain matches require review or separate records.
 
-Release-year mismatches are flagged for review, never silently excluded or automatically rejected; an admin can explicitly include them. Spotify market defaults to `IL` and remains configurable at the ingestion/season boundary. Repeat imports preserve votes/events and avoid duplicate known provider identities and memberships. See [catalog-ingestion.md](catalog-ingestion.md) for the separate implementation recommendations; no importer is implemented yet.
+Release-year mismatches are flagged for review, never silently excluded or automatically rejected; an admin can explicitly include them. Spotify market defaults to `IL` and remains configurable at the ingestion/season boundary. Repeat imports preserve votes/events and avoid duplicate known provider identities and memberships. See [catalog-ingestion.md](catalog-ingestion.md) for the separate implementation recommendations; the first local importer is now documented in [its operating guide](spotify-importer.md).
 
 ## Accepted catalog admission refinement (2026-10-07)
 
