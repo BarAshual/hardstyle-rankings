@@ -58,6 +58,7 @@ jobs:
           supabase start > .tools/ci-start.log 2>&1
       - run: supabase db reset --local
       - run: supabase db lint --local --level warning
+      - run: python3 -B -m unittest discover -s tests/importer -v
       - run: scripts/test-db.sh
       - name: Stop disposable stack
         if: always()

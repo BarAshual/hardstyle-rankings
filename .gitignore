@@ -17,3 +17,6 @@ supabase/snippets/
 .DS_Store
 *.swp
 *.swo
+
+# Protected local operator OAuth state and review files
+.importer/

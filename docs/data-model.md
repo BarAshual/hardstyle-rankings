@@ -11,9 +11,9 @@ Versioned migrations implement this baseline. See [database-foundation.md](datab
 | `seasons` | Annual season name/year, lifecycle state, and Super Like allowance configuration. |
 | `season_invitations` | Admin-invited email for a season; may exist before authentication and without a user ID. Normalized email is unique per season; acceptance records user ID and timestamp. |
 | `season_members` | Membership keyed by season and authenticated user; season-specific nickname. Created only after validating the invited Google identity. Role is member or admin; creator is the first admin. Display nickname casing is preserved; `(season_id, lower(btrim(nickname)))` is unique. |
-| `tracks` | Canonical track identity, title, artwork, Spotify/Apple Music references, and metadata. Provider matching rules are undecided. |
+| `tracks` | Canonical track identity, title, artwork, Spotify/Apple Music references, and metadata. Permanent internal UUID; distinct released musical versions require separate identities. Provider mapping storage is proposed below. |
 | `artists` | Canonical artist identity and metadata. |
-| `track_artists` | Many-to-many track/artist association; credit ordering and roles may be needed. |
+| `track_artists` | Many-to-many track/artist association; ordered credits are implemented; structured credit roles remain a future extension. |
 | `season_tracks` | Tracks included in each season; unique season/track association. Supports catalog growth during `VOTING`; an active flag is stored, with no deactivation API. |
 | `votes` | Current raw choice for a season, user, and track, with timestamps as needed. A positive integer version is required. |
 | `vote_events` | Append-only audit and replay ledger for accepted vote actions: actor/action UUID, target, expected/result version, prior/new choice, and timestamp. |
@@ -47,3 +47,17 @@ Append-only `season_config_events` records allowance increases; `season_lifecycl
 Invitations compare trimmed, lowercase email without alias folding. Trusted Google identity data in auth.identities and a confirmed matching auth.users email are required; user-editable metadata is never trusted. Acceptance binds to auth.users.id. Expiry, revocation, resend, and account switching remain deferred.
 
 No result tables, persisted snapshots, scoring fields, aggregation APIs, or reveal-category configuration are included. Entering REVEAL does not broaden raw-vote access.
+
+## Ingestion additions
+
+[Catalog ingestion design](catalog-ingestion.md) reviews the actual catalog constraints and recommends private track/artist provider mappings plus minimal import/item records. Accepted rules require provider keys to map to permanent internal UUIDs, mandatory separation of distinct released versions, and ISRC as matching/review evidence only. Recommended constraints keep provider keys unique and ISRC nonunique. Existing catalog URL fields would initially remain compatible display projections. The additive `20261007000100_catalog_import.sql` migration implements the first importer; no import operation rewrites votes or audit history.
+
+Recommend source configuration with one primary playlist per season and configurable Spotify market (initially `IL`), private track/artist mappings with provenance and first/last observation times, and run/item records including mode and release-year inclusion decisions. Canonical titles/credits/duration stay curated; provider URL/artwork/availability/album/date observations can refresh under the documented policy without repointing identities. Suspected voted duplicates retain both canonical UUIDs and history and receive a private review record. The implemented private table shapes and additive artwork curation flag are documented in [importer contracts](spotify-importer.md).
+
+Accepted admission policy distinguishes auto-admissible clean candidates from review-required exceptions; suspected duplicates cannot enter the season automatically. Recommended import-item records store that classification, evidence, and exception decision without preference data. IL availability is a provider observation, not an eligibility field. Source configuration changes must record actor/time and old/new playlist, apply only in SETUP/VOTING, and leave admitted memberships intact.
+
+Future audited withdrawal retains `season_tracks` and all restrictive vote/event relationships, stops new voting, excludes the association from eventual results, and exposes withdrawn/ineligible status only through appropriate personal history. Recommend explicit withdrawal actor/time/reason and eligibility history alongside the active state; no columns or API are implemented. Admission and normal withdrawal are limited to SETUP/VOTING. Reimports never remove or reactivate memberships automatically. Existing derived active-catalog progress and retained-vote Super Like accounting are unchanged by this documentation refinement.
+
+## First importer implementation (2026-10-07)
+
+The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.

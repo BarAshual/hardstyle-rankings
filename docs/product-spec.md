@@ -8,7 +8,7 @@ Users authenticate with Google through Supabase Auth and select a nickname for e
 
 ## Track Library and Voting
 
-Tracks are imported from a large yearly Spotify playlist. Each track should eventually include its name, artists, artwork, Spotify and Apple Music links, and relevant metadata. Apple Music matching and missing-link handling remain open design questions.
+Each season may designate one Spotify playlist as its primary initial ingestion source; canonical catalog identity remains provider-neutral for future sources. Each track should eventually include its name, artists, artwork, Spotify and Apple Music links, and relevant metadata. Apple Music matching and missing-link handling remain open design questions.
 
 The main interaction is Tinder-like voting:
 
@@ -26,7 +26,7 @@ Reliability is essential: acknowledged votes must survive reloads, retries, and 
 
 The catalog is not frozen when voting opens: voting may begin in October while November and December releases are added later. New tracks become unvoted tracks for every member without changing existing votes.
 
-Completion is derived from the current active season catalog and persisted votes. A member with no remaining tracks can receive new tracks later, and their completion percentage can decrease. “Finished” is a current derived observation, never a permanent boolean. Deletion, replacement, merging, and deduplication of tracks with votes require a separate explicit policy; none is approved here.
+Completion is derived from the current active season catalog and persisted votes. A member with no remaining tracks can receive new tracks later, and their completion percentage can decrease. “Finished” is a current derived observation, never a permanent boolean. If either suspected duplicate has vote history, preserve both canonical tracks, votes, and audit events: no automatic merge/deletion, vote movement, history rewrite, or silent deactivation. Flag it for explicit review; future reconciliation remains deferred.
 
 ## Season Lifecycle
 
@@ -54,3 +54,19 @@ The project owner's direct database access is an accepted trust boundary; crypto
 A dedicated reveal presentation may show Track of the Year, Artist of the Year, controversial tracks, taste similarity, and other rankings and insights. Scoring formulas, tie-breaking, and post-reveal visibility of individual votes are undecided. Do not implement a final ranking algorithm prematurely.
 
 After `REVEAL`, admins should eventually control which result and insight categories become visible. Toggles, defaults, sequence, and detailed behavior remain open. `REVEAL` is necessary for group preference exposure, not blanket authorization to publish individual raw votes. Future controls cannot bypass pre-reveal secrecy. The first database foundation must defer all scoring, result aggregation APIs, leaderboards, artist rankings, similarity, party presentation, reveal-category implementation, and persisted result snapshots.
+
+## Accepted ingestion rules (2026-10-07)
+
+Canonical recordings and artists retain permanent internal UUIDs; provider IDs are mappings. Distinct released musical versions MUST be separate canonical tracks, including originals, remixes, edits, extended/radio mixes, distinct released bootlegs, VIPs, live/acoustic/reworks, and other variants. Title/artist/duration/album similarities or shared ISRC cannot automatically establish equivalence. Exact accepted provider mappings are reused on reimport; uncertain matches require review or separate records.
+
+Release-year mismatches are flagged for review, never silently excluded or automatically rejected; an admin can explicitly include them. Spotify market defaults to `IL` and remains configurable at the ingestion/season boundary. Repeat imports preserve votes/events and avoid duplicate known provider identities and memberships. See [catalog-ingestion.md](catalog-ingestion.md) for the separate implementation recommendations; the first local importer is now documented in [its operating guide](spotify-importer.md).
+
+## Accepted catalog admission refinement (2026-10-07)
+
+Clean, unambiguous candidates from the designated playlist are admitted automatically after validation/identity checks. Only exceptions require explicit review: year mismatch, suspected duplicate/match, material identity inconsistency, or insufficient identifying metadata. Suspected duplicates are neither automatically admitted nor merged; an admin may admit a distinct recording, safely resolve its mapping, or defer/decline it without access to group voting preferences.
+
+Admission is allowed only in SETUP/VOTING, never LOCKED/REVEAL. The playlist is additive: disappearance does not remove, deactivate, delete, or alter votes. An admin may replace the designated playlist through an audited change during SETUP/VOTING, affecting future imports only and preserving all admitted tracks. IL playback restrictions are flagged but do not determine eligibility; identifiable recordings follow normal admission/review rules.
+
+Future audited admin withdrawal of an admitted mistake is allowed only in SETUP/VOTING. Preserve canonical identity, season association, votes, and audit history; stop new voting, exclude the track from eventual scoring/results, and retain personal historical views with withdrawn/ineligible status. Normal withdrawal after locking is forbidden; exceptional post-lock correction remains deferred. This behavior is not implemented yet.
+
+Clearly non-identity-changing provider URLs, artwork, availability, and album/release observations may refresh automatically. Material title, artist-credit identity, or version/remix changes require review; refresh never changes the canonical recording referenced by votes.

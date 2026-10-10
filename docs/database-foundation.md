@@ -2,7 +2,7 @@
 
 ## Status and boundaries
 
-Implemented source-data foundation using Supabase/Postgres 17. Scoring, results, music-provider integration, email delivery, and reveal presentation remain deferred. The first frontend slice is documented in [frontend.md](frontend.md). The source migrations are authoritative for schema and function signatures. Accepted product/architecture decisions are in [decisions.md](decisions.md).
+Implemented source-data foundation using Supabase/Postgres 17. Scoring, results, email delivery, and reveal presentation remain deferred. The [first local Spotify importer](spotify-importer.md) is implemented separately, with bounded local live-provider verification recorded in its operating guide. The first frontend slice is documented in [frontend.md](frontend.md). The source migrations are authoritative for schema and function signatures. Accepted product/architecture decisions are in [decisions.md](decisions.md).
 
 The implementation uses one season row lock to serialize writes for a season. This intentionally favors simple correctness over throughput for approximately 15 friends. No mutable Super Like usage counter, permanent completion flag, synchronization service, or result snapshot exists.
 
@@ -30,6 +30,9 @@ Python dependencies are pinned in `tests/requirements.txt`. A normal `.venv` is 
 
 | Migration | Contents |
 | --- | --- |
+| `20261007000100_catalog_import.sql` | Private provider identities, audited source configuration, plans/review decisions/item receipts, additive artwork curation flag, and authenticated season-admin import RPCs. |
+| `20261008000100_import_evidence.sql` | Additive retained ISRC evidence/backfill, optional baseline initialization, consistent indexed collision predicates, and material match/peer binding for importer reviews. |
+| `20261008000200_import_artist_evidence.sql` | Additive material artist-collision evidence and exact reviewed same-plan artist-peer validation; preserves mappings and history. |
 | `20261001000100_core.sql` | Seasons, membership, invitations, tracks, artists/credits, catalog, current votes, immutable vote/configuration/lifecycle events, keys/checks/indexes, deferred audit consistency, initial deny-by-default grants/RLS. |
 | `20261001000200_api.sql` | Trusted identity helpers and secured transactional mutation and progress RPCs. |
 | `20261001000300_security.sql` | Explicit select policies and execute grants/revocations for named application objects; unrelated public objects/default privileges are untouched. |
@@ -118,3 +121,7 @@ having count(*) > 1;
 Resolve any returned collisions deliberately before `supabase migration up --local`; the migration fails instead of renaming users or discarding membership. Index creation itself prevents concurrent duplicates. Invitation acceptance retains its season lock and email/account checks, now uses `ON CONFLICT (season_id,user_id) DO NOTHING`, and translates only the nickname-index violation to SQLSTATE 23505 / `nickname_unavailable`, without another member’s identity or raw constraint details. Failure rolls back membership and invitation acceptance together; a same-user accepted-invitation retry remains idempotent. No historical migration was edited.
 
 My Picks introduces no new RPC or table grant. The client reads `votes`, explicitly filtered by caller and season, joins `season_tracks → tracks → track_artists → artists`, orders by track UUID, and requests pages of 500 using an exclusive UUID cursor. It includes inactive rated tracks for viewing; new edits still require active catalog membership. RLS enforces ownership even if a caller removes/spoofs client filters. `cast_vote` is unchanged, including its current-version requirement, UUID ledger, audit checks, READ COMMITTED guard, and season-level locking.
+
+## First importer implementation (2026-10-07)
+
+The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.
