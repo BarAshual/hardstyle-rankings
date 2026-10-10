@@ -103,6 +103,10 @@ Pre-commit cleanup verification: the clean local reset and database lint passed.
 Before frontend integration, confirm real Google OAuth configuration and the local provider handshake, and agree on the client's conflict/pending-state behavior using the contract above. Before collecting real votes, define and test production backups and restore procedures; local migration reset rebuilds schema and synthetic data, not real voting history. Invitation lifecycle UX, destructive catalog/account policies, deterministic ordering, reveal visibility, and production deployment remain deferred. No unresolved product decision prevents use of the foundation APIs.
 
 
+## Production deployment
+
+The accepted initial deployment uses a clean Supabase Cloud Free project, separate from local accounts and experimental votes. Follow [deployment.md](deployment.md) for the migration-only workspace, explicit target checks, Google Auth configuration and recovery/pilot gates. Never apply synthetic seed data or run the destructive integration runner on Cloud. This operating guide does not claim that remote migrations or recovery have been tested.
+
 ## Reference documentation
 
 The implementation follows Supabase's [RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security), [Auth identity model](https://supabase.com/docs/guides/auth/identities), and [local CLI configuration](https://supabase.com/docs/guides/local-development/cli/config). Provider credentials and owner/service keys remain deployment concerns, never application-admin privileges.

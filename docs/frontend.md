@@ -4,7 +4,7 @@
 
 Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. The first voting UI is described below. There is no admin dashboard, result calculation, email delivery, or music-provider integration.
 
-The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, `/seasons/:seasonId/rate`, and `/seasons/:seasonId/my-picks`. BrowserRouter requires a production host to serve index.html for these paths; hosting is not selected yet. The dev server already provides that fallback.
+The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, `/seasons/:seasonId/rate`, and `/seasons/:seasonId/my-picks`. BrowserRouter requires a production host to serve index.html for these paths; the tracked vercel.json supplies this fallback on Vercel. See [deployment.md](deployment.md) for the accepted free-tier rollout and exact production configuration. The dev server already provides that fallback.
 
 ## Run locally
 

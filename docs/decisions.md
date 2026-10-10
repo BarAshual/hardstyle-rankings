@@ -146,3 +146,9 @@ Audited withdrawal is distinct from the automatic deactivation prohibited by D34
 ## First importer implementation (2026-10-07)
 
 The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.
+
+## Accepted initial production rollout (2026-10-11)
+
+The owner selected Vercel Hobby and Supabase Cloud Free, with no paid upgrades or domain purchase for now. The requested frontend name is tiloz-ranking-2k26; its vercel.app domain remains subject to assignment. Production starts clean: local votes are experiments and are not transferred. Repeated hosted tests and a 2–3 user pilot use separate dummy seasons. The first dummy season allowance is 50; the official allowance remains open.
+
+A dummy season does not isolate shared schema/catalog changes or database restore. Destructive rehearsals require a separate disposable target once official data exists. Backup frequency, acceptable recovery loss/downtime, independent storage and scheduling remain open; tested recovery is required before official voting. See [deployment.md](deployment.md) for the runbook and unverified rollout status. Existing vote integrity, owner trust boundary and pre-REVEAL secrecy are unchanged.

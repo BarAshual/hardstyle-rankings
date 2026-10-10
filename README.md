@@ -10,6 +10,7 @@ Start with [Database foundation](docs/database-foundation.md) for local setup, m
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)
 - [Decision record](docs/decisions.md)
+- [Deployment and production](docs/deployment.md)
 
 Local quick start (Docker, Supabase CLI, Python 3.9+):
 

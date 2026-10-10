@@ -20,3 +20,6 @@ supabase/snippets/
 
 # Protected local operator OAuth state and review files
 .importer/
+
+# Local Vercel project state
+.vercel/
