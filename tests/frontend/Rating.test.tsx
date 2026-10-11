@@ -28,7 +28,7 @@ function fake() {
   let state: Home["season"]["state"] = "VOTING";
   const api = {
     restore: vi.fn().mockResolvedValue({ id: uid }),
-    subscribe: vi.fn(() => () => {}),
+    subscribe: vi.fn<API["subscribe"]>(() => () => {}),
     signIn: vi.fn(),
     complete: vi.fn(),
     signOut: vi.fn(),
@@ -342,5 +342,192 @@ describe("durable rating", () => {
     await screen.findByRole("heading", { name: "Track 1" });
     expect(screen.getByText("Spotify unavailable")).toBeInTheDocument();
     expect(screen.getByText("Apple Music unavailable")).toBeInTheDocument();
+  });
+});
+
+const pointer = (x: number, y: number) => ({
+  pointerId: 1,
+  pointerType: "touch",
+  isPrimary: true,
+  button: 0,
+  clientX: 160 + x,
+  clientY: 220 + y,
+});
+function swipe(x: number, y: number) {
+  const card = screen.getByRole("group", { name: /Swipe to rate/ });
+  vi.spyOn(card, "getBoundingClientRect").mockReturnValue({
+    width: 320,
+    height: 360,
+  } as DOMRect);
+  fireEvent.pointerDown(card, pointer(0, 0));
+  fireEvent.pointerMove(card, pointer(x, y));
+  fireEvent.pointerUp(card, pointer(x, y));
+  return card;
+}
+describe("swipe submission and stable transitions", () => {
+  it.each<[number, number, Choice]>([
+    [-100, 0, "PASS"],
+    [100, 0, "LIKE"],
+    [0, -100, "SUPER_LIKE"],
+  ])(
+    "journals the %s, %s swipe through the existing receipt path",
+    async (x, y, choice) => {
+      const { api } = fake();
+      const cast = api.castVote.getMockImplementation()!;
+      api.castVote.mockImplementation(async (a) => {
+        expect(readPending(uid, sid)?.action).toEqual(a);
+        return cast(a);
+      });
+      mount(api);
+      await screen.findByRole("heading", { name: "Track 1" });
+      swipe(x, y);
+      fireEvent.click(button("PASS"));
+      await screen.findByRole("heading", { name: "Track 2" });
+      expect(api.castVote).toHaveBeenCalledOnce();
+      expect(api.castVote.mock.calls[0][0]).toMatchObject({
+        choice,
+        expected_version: 0,
+      });
+    },
+  );
+  it("holds the card and progress while saving, then exits only after a matching receipt", async () => {
+    const { api, votes } = fake();
+    let resolve!: (r: Awaited<ReturnType<API["castVote"]>>) => void;
+    api.castVote.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    const { container } = mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    const stage = container.querySelector(".rating-stage");
+    const actions = container.querySelector(".vote-actions");
+    const card = swipe(100, 0);
+    expect(card).toHaveAttribute("data-exit", "");
+    expect(screen.getByText(/0 \/ 3 rated/)).toBeInTheDocument();
+    expect(api.nextTrack).toHaveBeenCalledOnce();
+    const a = api.castVote.mock.calls[0][0];
+    votes.set(a.track_id, a.choice);
+    await act(async () => resolve({ ...a, version: 1, accepted_at: "now" }));
+    expect(card).toHaveAttribute("data-exit", "LIKE");
+    expect(button("LIKE")).toBeDisabled();
+    await screen.findByRole("heading", { name: "Track 2" });
+    expect(container.querySelector(".rating-stage")).toBe(stage);
+    expect(container.querySelector(".vote-actions")).toBe(actions);
+  });
+  it("retains a pending swipe and its context on a mismatched receipt", async () => {
+    const { api } = fake();
+    api.castVote.mockImplementationOnce(async (a) => ({
+      ...a,
+      choice: "PASS",
+      version: 1,
+      accepted_at: "now",
+    }));
+    mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    const card = swipe(100, 0);
+    await screen.findByText(/couldn’t confirm this vote/);
+    expect(card).toHaveAttribute("data-exit", "");
+    expect(readPending(uid, sid)?.action.choice).toBe("LIKE");
+    expect(api.nextTrack).toHaveBeenCalledOnce();
+    expect(button("LIKE")).toBeDisabled();
+  });
+  it("returns a zero-allowance upward swipe without an RPC", async () => {
+    const { api, votes } = fake();
+    votes.set(tracks[2].id, "SUPER_LIKE");
+    mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    swipe(0, -120);
+    expect(screen.getByText(/used all your Super Likes/)).toBeInTheDocument();
+    expect(api.castVote).not.toHaveBeenCalled();
+    expect(button("SUPER_LIKE")).toBeDisabled();
+    expect(button("LIKE")).toBeEnabled();
+  });
+  it("reconciles a concurrent allowance rejection without a second submission", async () => {
+    const { api, votes } = fake();
+    api.castVote.mockImplementationOnce(async () => {
+      votes.set(tracks[2].id, "SUPER_LIKE");
+      throw { message: "super_like_limit" };
+    });
+    mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    swipe(0, -120);
+    await waitFor(() => expect(button("LIKE")).toBeEnabled());
+    expect(screen.getByText(/used all your Super Likes/)).toBeInTheDocument();
+    expect(screen.getByText(/0 Super Likes remaining/)).toBeInTheDocument();
+    expect(api.castVote).toHaveBeenCalledOnce();
+    expect(readPending(uid, sid)).toBeNull();
+  });
+  it("waits within the card slot for a slow next read and retries a failed read only", async () => {
+    const { api } = fake();
+    let reject!: (e: Error) => void;
+    mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    api.nextTrack.mockImplementationOnce(
+      () =>
+        new Promise((_, r) => {
+          reject = r;
+        }),
+    );
+    swipe(-100, 0);
+    await screen.findByText("Loading your next track…");
+    expect(button("PASS")).toBeDisabled();
+    expect(readPending(uid, sid)).toBeNull();
+    await act(async () => reject(new Error("read failed")));
+    await screen.findByRole("button", { name: "Try again" });
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByRole("heading", { name: "Track 2" });
+    expect(api.castVote).toHaveBeenCalledOnce();
+  });
+  it("keeps provider interaction and outside scrolling out of the drag surface", async () => {
+    const { api } = fake();
+    api.nextTrack.mockResolvedValueOnce({
+      ...tracks[0],
+      spotify_url: "https://open.spotify.com/track/1",
+    });
+    mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    const link = screen.getByRole("link", { name: /Listen on Spotify/ });
+    const card = screen.getByRole("group", { name: /Swipe to rate/ });
+    expect(card).not.toContainElement(link);
+    fireEvent.pointerDown(link, pointer(0, 0));
+    fireEvent.pointerUp(link, pointer(150, 0));
+    fireEvent.scroll(document.body);
+    expect(api.castVote).not.toHaveBeenCalled();
+  });
+  it("preserves keyboard voting and skips motion delays when reduced motion is requested", async () => {
+    const { api } = fake();
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+    try {
+      mount(api);
+      await screen.findByRole("heading", { name: "Track 1" });
+      button("PASS").focus();
+      await userEvent.keyboard("{Enter}");
+      await screen.findByRole("heading", { name: "Track 2" });
+      expect(
+        screen.getByRole("group", { name: /Swipe to rate/ }),
+      ).toHaveAttribute("data-entering", "false");
+      expect(api.castVote).toHaveBeenCalledOnce();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+  it("cancels a gesture on account change and ignores the departing actor’s response", async () => {
+    const { api } = fake();
+    let identityChanged!: Parameters<API["subscribe"]>[0];
+    api.subscribe.mockImplementation((listener) => {
+      identityChanged = listener;
+      return () => {};
+    });
+    mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    const card = screen.getByRole("group", { name: /Swipe to rate/ });
+    fireEvent.pointerDown(card, pointer(0, 0));
+    fireEvent.pointerMove(card, pointer(100, 0));
+    act(() => identityChanged({ id: "10000000-0000-0000-0000-000000000002" }));
+    fireEvent.pointerUp(card, pointer(100, 0));
+    expect(api.castVote).not.toHaveBeenCalled();
   });
 });

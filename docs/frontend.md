@@ -135,7 +135,7 @@ Before sending a vote, the browser writes its full action payload and display me
 
 Network/unknown errors retain the pending action and show Retry pending vote. Definitive version/action conflicts, allowance errors, inactive tracks, closed voting, and lost membership show friendly messages and refresh authoritative state. The screen never upgrades expected_version to edit an existing vote. A different-device first vote is preserved. If receipt reconciliation succeeds but the next read fails, retry reloads the queue without sending another vote. Corrupt/unavailable local storage blocks new submissions rather than silently dropping an uncertain action. Cross-device and simultaneous-tab races are ultimately resolved by the database version/idempotency contract; no browser lock is treated as authority.
 
-My Picks below adds existing-vote edits. Gestures, results, scores, provider import, and admin UI remain excluded.
+My Picks below adds existing-vote edits. Rating now implements the accepted swipe mapping as documented below. Results, scores, and admin UI remain excluded; the separate operator importer is documented in [spotify-importer.md](spotify-importer.md).
 
 ### Local development catalog
 
@@ -212,3 +212,38 @@ where private.normalize_email(u.email) in (
 Studio is privileged owner tooling: this confirms stored membership, not client RLS. The actual HTTP tests independently verify that forwarded invitations fail and raw choices remain private. Do not inspect/share other members’ votes as part of this check.
 
 My Picks milestone verification (2026-10-06): **56 frontend tests** and **45 database/API tests** passed (37 direct database tests, 8 real HTTP tests). Typecheck, ESLint, production build, six-migration clean isolated rebuild, database lint, and workflow actionlint passed. The My Picks route is split into a separate chunk; the main bundle stays below Vite’s default warning threshold. Browser verification against synthetic identities and real local PostgREST covered search/filter, Super Like release/limit, lost-response edit retry across reload, two-tab stale conflict, and locked read-only choices, without horizontal overflow or runtime errors. This did not exercise real Google OAuth. The normal local database had zero nickname collision groups; the additive migration and lint succeeded there without resetting accounts/votes.
+
+
+## Mobile rating interaction (2026-10-11)
+
+Rating and My Picks share `MusicLinks` with locally stored official Apple Music and Spotify icons. Following the owner's approved design revision, the compact Apple button uses the official white icon instead of the original full Listen on badge. A shared visible “Listen on” caption accompanies single-row icon/service-name buttons: red Apple Music with white content, green Spotify with black content. Both have equal-width columns, 52 CSS px height and 10 px corner radius. The group fills its content column; in Rating the outer edges, column widths and 12 px gap align with the voting buttons. Icons fit a 24 px box without changing aspect ratios; Spotify has at least 12 px clear space. Narrow layouts reduce text/padding and wrap only when two 124 px columns plus the 12 px gap do not fit. The unchanged HTTPS/provider-host validator and `target="_blank" rel="noopener noreferrer"` protect every active link. Missing/invalid URLs render unavailable text, never invented matches. See [asset provenance and brand spacing](../src/assets/README.md). Links, buttons, track text, and navigation are outside the draggable frame. Rating is lazy-loaded at route entry; subsequent votes retain its mounted layout.
+
+Only an unrated Rating card in VOTING accepts new gestures: left PASS, right LIKE, up SUPER_LIKE. Buttons provide the full keyboard/assistive alternative; My Picks has no gestures. A dedicated artwork/frame surface uses `touch-action: none` while enabled, leaving ordinary page scrolling outside it. Direct transform updates follow the pointer without easing during movement. Text/arrow feedback lives in a reserved frame band outside the artwork; strength increases with displacement. Downward and ambiguous diagonal movement are neutral.
+
+The following are implementation calibration values, not changes to product rules or claims of physical-device validation:
+
+| Parameter | Implemented value |
+| --- | --- |
+| Activation distance | 12 CSS px |
+| Clear direction | Dominant axis must exceed the other by 1.35× |
+| Horizontal release threshold | 25% of surface width, clamped to 72–120 CSS px |
+| Upward release threshold | 25% of surface height, clamped to 80–130 CSS px |
+| Horizontal rotation | At most ±7°; upward intent has no rotation |
+| Return to center | 210 ms ease-out |
+| Confirmed exit | 220 ms ease-in in the accepted choice's direction |
+| Next-card entry | 180 ms ease-out, 14 CSS px upward arrival |
+| Reduced motion | No card translation, rotation or CSS animation; no exit wait |
+
+Only final displacement on matching pointer release can submit. Crossing a threshold and returning inside it never votes, and velocity does not bypass distance. Additional touch anywhere on the document, pointer cancellation/lost capture, window blur, hidden document/pagehide, route departure, and account changes cancel before submission. Beginning a drag cancels any ongoing entry animation. At zero authoritative Super Likes, an upward release returns to center with a limit explanation and no request; the server still rejects a concurrent quota change.
+
+Buttons and gestures call the same submission handler, journal the full original action before network, validate the same accepted receipt, and retain the same UUID/payload after uncertainty. A synchronous guard blocks repeated events. Saving/unknown/recovery/next-read states block new choices. Cancellation ends at submission: there is no post-send Undo. Journal schema, receipt validation, RPCs, versioning, RLS, Auth and secrecy are unchanged.
+
+The progress/header, square card slot, scroll position, provider slots, and button/recovery areas remain mounted. Saving stays on the current card. A matching receipt enables the directional exit and starts the existing home/next-track reads. A slow read waits inside the square slot; failed reads expose Try again and never resend an accepted vote. Progress/allowance update only from the fresh home read. A brief screen-reader status replaces the repeated large success notice. Errors retain visible explanations. Track text has a fixed-height scrollable area so long titles remain available without shifting controls; artwork failure uses the ordinary placeholder. Closed/caught-up states occupy the same card slot.
+
+### Verification and remaining pilot checks
+
+All 92 frontend tests, TypeScript, ESLint and the production build passed. Focused tests cover gestures, duplicate release/button submission, cancellation, quota races, storage/receipt failure, lost-response retry, read-only retries after acceptance, account changes, keyboard controls and reduced-motion behavior, alongside existing Rating/My Picks recovery tests.
+
+Chrome used emulated touch/mobile mode against the existing guarded synthetic Supabase project (API 55421, database 55422), with no reset or changes to real local/Cloud data. Real API checks covered neutral gestures, multitouch/cancel, scrolling outside the card, slow acceptance, failed next read, identical lost-response replay after reload, all three choices, zero quota, keyboard/button voting, reduced motion, another-session conflict, and accepted replay after LOCKED. A member-RLS audit confirmed exactly eight version-1 votes and eight unique audit events. My Picks remained private/read-only after closure and had no swipe surface. Mobile layouts at 320/390/414 CSS px had no horizontal overflow/runtime errors; a fictional-data browser preview additionally checked 375 px, branded/missing link slot stability, minimum touch targets, and caught-up layout. These are browser simulations, not physical-device or real Google OAuth verification. The full database integration suite was not rerun because no backend contract changed.
+
+Before the pilot, test Safari/iOS and Chrome/Android on physical phones: (1) taps/jitter, below threshold, diagonal/down, and crossing then returning; (2) each deliberate direction, a second finger, app switching and screen-edge system gestures; (3) scrolling outside the frame and opening provider links; (4) slow/offline responses, reload and same-action recovery, plus next-read-only retry; (5) zero quota, closed season, keyboard/screen-reader access, missing artwork/links, long titles and the OS Reduce Motion setting. Threshold comfort, native provider handoff and edge-system gestures remain physical-device checks. Existing production recovery/restore readiness in [deployment.md](deployment.md) remains a separate release prerequisite.

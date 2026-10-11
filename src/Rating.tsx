@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "./auth";
 import { uuidPattern, type Choice, type Home, type Track } from "./api";
+import { MusicLinks } from "./MusicLinks";
+import { SwipeCard } from "./SwipeCard";
+import { EXIT_MS } from "./swipe";
+import { rejected } from "./voteErrors";
 import {
   confirmPending,
   readPending,
@@ -9,62 +13,8 @@ import {
   savePending,
   type PendingVote,
 } from "./pendingVotes";
+export { musicURL } from "./MusicLinks";
 
-export function musicURL(
-  value: string | null,
-  provider: "spotify" | "apple",
-): string | null {
-  try {
-    const url = new URL(value ?? "");
-    if (url.protocol !== "https:" || url.username || url.password) return null;
-    return url.hostname ===
-      (provider === "spotify" ? "open.spotify.com" : "music.apple.com")
-      ? url.href
-      : null;
-  } catch {
-    return null;
-  }
-}
-export function Artwork({ track }: { track: Track }) {
-  const [failed, setFailed] = useState(false);
-  let url: URL | undefined;
-  try {
-    url = new URL(track.artwork_url ?? "");
-  } catch {
-    /* Use local placeholder. */
-  }
-  return !failed && url?.protocol === "https:" ? (
-    <img
-      className="track-art"
-      src={url.href}
-      alt=""
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  ) : (
-    <div
-      className="track-art placeholder"
-      role="img"
-      aria-label="Track artwork placeholder"
-    >
-      <span>HS / 26</span>
-      <span aria-hidden="true">↗</span>
-    </div>
-  );
-}
-export const rejected: Record<string, string> = {
-  super_like_limit:
-    "You’ve used all your Super Likes. Choose PASS or LIKE instead.",
-  voting_closed:
-    "Voting is closed or hasn’t opened yet. This vote wasn’t saved.",
-  vote_version_conflict:
-    "This track was already rated in another session. Your existing vote wasn’t changed.",
-  action_payload_conflict:
-    "This action ID was already used for a different vote. This request wasn’t applied; refresh before continuing.",
-  track_not_active: "This track is no longer available for voting.",
-  season_membership_required:
-    "This season is no longer available to your account.",
-};
 export function Rating() {
   const { seasonId = "" } = useParams();
   const { identity } = useAuth();
@@ -80,8 +30,13 @@ function RatingSession({ seasonId }: { seasonId: string }) {
   const [pending, setPending] = useState<PendingVote | null>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [readError, setReadError] = useState(false);
   const [message, setMessage] = useState("");
+  const [success, setSuccess] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [exit, setExit] = useState<Choice | null>(null);
+  const [entering, setEntering] = useState(false);
+  const departure = useRef<Choice | null>(null);
   const submitting = useRef(false);
   const mounted = useRef(false);
   useEffect(() => {
@@ -92,48 +47,103 @@ function RatingSession({ seasonId }: { seasonId: string }) {
   }, []);
   useEffect(() => {
     let active = true;
-    setReady(false);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let resolveExit = () => {};
+    const leaving = departure.current;
+    const reduced = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    departure.current = null;
+    setReadError(false);
+    // Start the ordinary authoritative reads only after receipt confirmation.
+    // Keep the outgoing card for the exit; a slow read then waits in the same slot.
+    const exited = new Promise<void>((resolve) => {
+      resolveExit = resolve;
+      if (!leaving) {
+        resolve();
+        return;
+      }
+      timer = setTimeout(
+        () => {
+          if (active) {
+            setTrack(null);
+            setExit(null);
+          }
+          resolve();
+        },
+        reduced ? 0 : EXIT_MS,
+      );
+    });
     async function load() {
       if (!uuidPattern.test(seasonId)) throw new Error("Invalid season");
       const saved = readPending(user, seasonId);
       const nextHome = await api.home(seasonId, user);
       if (!nextHome) throw new Error("Unavailable season");
       const next = saved?.track ?? (await api.nextTrack(seasonId));
+      await exited;
       if (!active) return;
       setHome(nextHome);
       setTrack(next);
       setPending(saved);
+      setExit(null);
+      setEntering(!!leaving && !!next && !reduced);
       setReady(true);
-      if (saved)
+      if (saved) {
+        setSuccess(false);
         setMessage(
           "A vote is awaiting confirmation. Retry it safely before continuing.",
         );
+      }
     }
-    load().catch(() => {
-      if (active)
+    load().catch(async () => {
+      await exited;
+      if (active) {
+        setTrack(null);
+        setReadError(true);
+        setSuccess(false);
         setMessage(
           "We couldn’t load your rating session or pending vote. Check your connection and browser storage, then try again.",
         );
+      }
     });
     return () => {
       active = false;
+      if (timer) clearTimeout(timer);
+      resolveExit();
     };
   }, [api, seasonId, user, attempt]);
 
+  function refresh() {
+    if (submitting.current) return;
+    setReady(false);
+    setTrack(null);
+    setReadError(false);
+    setAttempt((n) => n + 1);
+  }
   async function submit(choice?: Choice) {
     if (
       submitting.current ||
       !ready ||
       !track ||
+      (choice && pending) ||
       (!pending && home?.season.state !== "VOTING")
     )
       return;
-    submitting.current = true;
+    if (
+      !pending &&
+      choice === "SUPER_LIKE" &&
+      home?.progress.super_likes_available === 0
+    ) {
+      setSuccess(false);
+      setMessage(rejected.super_like_limit);
+      return;
+    }
+    submitting.current = true; // Synchronous guard covers repeated release/click events.
     setBusy(true);
-    setMessage("");
+    setSuccess(false);
+    setMessage("Saving your choice…");
     let actionPending: PendingVote;
     try {
-      // Recover another tab's outstanding action before creating any new one.
       actionPending = pending ??
         readPending(user, seasonId) ?? {
           action: {
@@ -146,7 +156,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           },
           track,
         };
-      savePending(actionPending); // Fail closed if durable browser storage is unavailable.
+      savePending(actionPending); // Journal before network, fail closed on storage failure.
       setPending(actionPending);
       setTrack(actionPending.track);
     } catch {
@@ -162,8 +172,10 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       if (!mounted.current) return;
       setPending(null);
       setReady(false);
-      setTrack(null);
-      setMessage("Vote saved.");
+      setSuccess(true);
+      setMessage("Vote saved. Loading the next track.");
+      departure.current = actionPending.action.choice;
+      setExit(actionPending.action.choice);
       setAttempt((n) => n + 1);
     } catch (error) {
       if (!mounted.current) return;
@@ -178,8 +190,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           setReady(false);
           setTrack(null);
           setMessage(rejected[code]);
-          // A fresh backend read reconciles other-device votes, allowance, and season state.
-          setAttempt((n) => n + 1);
+          setAttempt((n) => n + 1); // Reconcile authoritative state; never overwrite a conflict.
         } catch {
           setMessage(
             "Couldn’t clear the pending action. Restore browser storage and retry safely.",
@@ -195,126 +206,123 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       if (mounted.current) setBusy(false);
     }
   }
-  const spotify = musicURL(track?.spotify_url ?? null, "spotify");
-  const apple = musicURL(track?.apple_music_url ?? null, "apple");
   const closed = home?.season.state !== "VOTING";
+  const enabled = ready && !!track && !busy && !pending && !closed;
+  const terminal = ready && !pending && (closed || !track);
   return (
     <section className="rating">
       <Link to={`/seasons/${seasonId}`} className="back-link">
         ← Season home
       </Link>
       <p className="eyebrow">{home?.season.name ?? "Your season"}</p>
-      {home && (
-        <p className="rating-progress">
-          {home.progress.rated} / {home.progress.active_tracks} rated ·{" "}
-          {home.progress.super_likes_available} Super Likes remaining
-        </p>
-      )}
-      {message && (
-        <p role="status" className="notice">
+      <p className="rating-progress">
+        {home
+          ? `${home.progress.rated} / ${home.progress.active_tracks} rated · ${home.progress.super_likes_available} Super Likes remaining`
+          : "Loading your latest progress…"}
+      </p>
+      <div className="rating-message-slot">
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={success ? "sr-only" : "rating-message"}
+        >
           {message}
         </p>
-      )}
-      {!ready ? (
-        <>
-          <p>Loading your latest progress…</p>
-          <button disabled={busy} onClick={() => setAttempt((n) => n + 1)}>
-            Try again
-          </button>
-        </>
-      ) : closed && !pending ? (
-        <>
-          <h1>
-            {home?.season.state === "SETUP"
-              ? "Getting ready."
-              : "Voting is closed."}
-          </h1>
-          <p>Your saved votes stay safe. Check back with your season admin.</p>
-        </>
-      ) : !track ? (
-        <>
-          <h1>You’re caught up.</h1>
-          <p>
-            You’ve rated every track currently available. New releases may still
-            appear.
-          </p>
-          <button onClick={() => setAttempt((n) => n + 1)}>
-            Check for new tracks
-          </button>
-        </>
-      ) : (
-        <>
-          <Artwork key={track.id} track={track} />
-          <h1 className="track-title">{track.title}</h1>
-          <p className="track-artists">
-            {track.artists.join(" & ") || "Artist unavailable"}
-          </p>
-          <div className="music-actions">
-            {spotify ? (
-              <a
-                className="button"
-                href={spotify}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Spotify ↗
-              </a>
-            ) : (
-              <span>Spotify unavailable</span>
-            )}
-            {apple ? (
-              <a
-                className="button"
-                href={apple}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Apple Music ↗
-              </a>
-            ) : (
-              <span>Apple Music unavailable</span>
-            )}
+      </div>
+      <div className="rating-stage" aria-busy={busy || !ready}>
+        {terminal ? (
+          <div className="rating-stage-message">
+            <h1>
+              {closed
+                ? home?.season.state === "SETUP"
+                  ? "Getting ready."
+                  : "Voting is closed."
+                : "You’re caught up."}
+            </h1>
+            <p>
+              {closed
+                ? "Your saved votes stay safe. Check back with your season admin."
+                : "You’ve rated every track currently available. New releases may still appear."}
+            </p>
+            {!closed && <button onClick={refresh}>Check for new tracks</button>}
           </div>
-          {pending ? (
-            <div>
-              <p>Pending: {pending.action.choice.replace("_", " ")}</p>
-              <button
-                className="primary"
-                disabled={busy}
-                onClick={() => void submit()}
-              >
-                {busy ? "Saving vote…" : "Retry pending vote"}
-              </button>
-            </div>
-          ) : (
-            <div className="vote-actions">
-              <button
-                disabled={busy || closed}
-                onClick={() => void submit("PASS")}
-              >
-                ← PASS
-              </button>
-              <button
-                className="like"
-                disabled={busy || closed}
-                onClick={() => void submit("LIKE")}
-              >
-                LIKE →
-              </button>
-              <button
-                className="super"
-                disabled={busy || closed}
-                onClick={() => void submit("SUPER_LIKE")}
-              >
-                ↑ SUPER LIKE
-              </button>
-            </div>
-          )}
-          <p className="fine">
-            Your choice is saved before the next track appears.
-          </p>
-        </>
-      )}
+        ) : track ? (
+          <SwipeCard
+            key={track.id}
+            track={track}
+            enabled={enabled}
+            saving={busy}
+            exit={exit}
+            entering={entering}
+            onEntered={() => setEntering(false)}
+            onChoice={(c) => void submit(c)}
+          />
+        ) : (
+          <div className="rating-stage-message">
+            <p>
+              {readError
+                ? "The next track is unavailable right now."
+                : "Loading your next track…"}
+            </p>
+            {readError && <button onClick={refresh}>Try again</button>}
+          </div>
+        )}
+      </div>
+      <div className="rating-track-copy">
+        {track && (
+          <>
+            <h1 className="track-title">{track.title}</h1>
+            <p className="track-artists">
+              {track.artists.join(" & ") || "Artist unavailable"}
+            </p>
+          </>
+        )}
+      </div>
+      <MusicLinks track={track} />
+      <p id="swipe-hint" className="swipe-hint">
+        ← PASS · LIKE → · ↑ SUPER LIKE
+        <br />
+        Swipe the card or use the buttons below.
+      </p>
+      <div className="vote-actions">
+        <button disabled={!enabled} onClick={() => void submit("PASS")}>
+          ← PASS
+        </button>
+        <button
+          className="like"
+          disabled={!enabled}
+          onClick={() => void submit("LIKE")}
+        >
+          LIKE →
+        </button>
+        <button
+          className="super"
+          disabled={!enabled || home?.progress.super_likes_available === 0}
+          onClick={() => void submit("SUPER_LIKE")}
+        >
+          ↑ SUPER LIKE
+        </button>
+      </div>
+      <div className="rating-recovery">
+        {pending && (
+          <>
+            <p className="fine">
+              Pending: {pending.action.choice.replace("_", " ")}
+            </p>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() => void submit()}
+            >
+              {busy ? "Saving vote…" : "Retry pending vote"}
+            </button>
+          </>
+        )}
+      </div>
+      <p className="fine">
+        Your choice is saved before the next track appears.
+      </p>
     </section>
   );
 }

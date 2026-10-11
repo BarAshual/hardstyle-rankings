@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "./auth";
 import { uuidPattern, type Choice, type Home, type Pick } from "./api";
-import { Artwork, musicURL, rejected } from "./Rating";
+import { rejected } from "./voteErrors";
+import { Artwork } from "./Artwork";
+import { MusicLinks } from "./MusicLinks";
 import {
   confirmPending,
   readPending,
@@ -228,8 +230,6 @@ function PicksSession({ seasonId }: { seasonId: string }) {
           ) : (
             <ul className="picks-list">
               {visible.map((p) => {
-                const spotify = musicURL(p.spotify_url, "spotify");
-                const apple = musicURL(p.apple_music_url, "apple");
                 return (
                   <li key={p.id}>
                     <article aria-label={p.title} className="pick-card">
@@ -246,30 +246,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                             preserved.
                           </p>
                         )}
-                        <div className="music-actions">
-                          {spotify ? (
-                            <a
-                              href={spotify}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Spotify ↗
-                            </a>
-                          ) : (
-                            <span>Spotify unavailable</span>
-                          )}
-                          {apple ? (
-                            <a
-                              href={apple}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Apple Music ↗
-                            </a>
-                          ) : (
-                            <span>Apple Music unavailable</span>
-                          )}
-                        </div>
+                        <MusicLinks track={p} />
                         <div
                           className="pick-actions"
                           aria-label={`Edit ${p.title}`}

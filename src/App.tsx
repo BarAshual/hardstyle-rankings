@@ -26,7 +26,9 @@ import {
   type Invitation,
 } from "./api";
 
-import { Rating } from "./Rating";
+const Rating = lazy(() =>
+  import("./Rating").then((module) => ({ default: module.Rating })),
+);
 const MyPicks = lazy(() =>
   import("./MyPicks").then((module) => ({ default: module.MyPicks })),
 );
@@ -497,7 +499,9 @@ function Shell() {
             path="/seasons/:seasonId/rate"
             element={
               <RequireAuth>
-                <Rating />
+                <Suspense fallback={<Loading />}>
+                  <Rating />
+                </Suspense>
               </RequireAuth>
             }
           />
