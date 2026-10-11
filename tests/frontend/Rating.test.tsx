@@ -412,7 +412,9 @@ describe("swipe submission and stable transitions", () => {
       const card = swipe(x, y);
       expect(card).toHaveAttribute("data-exit", "");
       expect(card.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
-      expect(card.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+      expect(card.style.getPropertyValue("--drag-y")).toBe(
+        `${Math.min(y, 0)}px`,
+      );
       fireEvent.lostPointerCapture(card, pointer(x, y));
       expect(card.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
       expect(screen.getByText(/0 \/ 3 rated/)).toBeInTheDocument();
@@ -422,7 +424,9 @@ describe("swipe submission and stable transitions", () => {
       await act(async () => resolve({ ...a, version: 1, accepted_at: "now" }));
       expect(card).toHaveAttribute("data-exit", choice);
       expect(card.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
-      expect(card.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+      expect(card.style.getPropertyValue("--drag-y")).toBe(
+        `${Math.min(y, 0)}px`,
+      );
       expect(button("LIKE")).toBeDisabled();
       await screen.findByRole("heading", { name: "Track 2" });
       expect(container.querySelector(".rating-stage")).toBe(stage);

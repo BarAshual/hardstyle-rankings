@@ -65,6 +65,50 @@ describe("deliberate swipe", () => {
     fireEvent.pointerUp(surface, point(25, 0));
     expect(onChoice).not.toHaveBeenCalled();
   });
+  it.each([
+    [0, 140],
+    [10, 140],
+    [-110, 100],
+    [110, 100],
+  ])(
+    "keeps downward drag %s, %s centered without turning it into a vote",
+    (x, y) => {
+      const { surface, onChoice } = card();
+      fireEvent.pointerMove(surface, point(x, y));
+      expect(surface.style.getPropertyValue("--drag-x")).toBe("0px");
+      expect(surface.style.getPropertyValue("--drag-y")).toBe("0px");
+      expect(surface.style.getPropertyValue("--drag-rotation")).toBe("0deg");
+      expect(surface.style.getPropertyValue("--intent-strength")).toBe("0");
+      expect(surface.dataset.intent).toBe("");
+      fireEvent.pointerUp(surface, point(x, y));
+      expect(onChoice).not.toHaveBeenCalled();
+    },
+  );
+  it("cancels an upward swipe even after returning past the center downward", () => {
+    const { surface, onChoice } = card();
+    fireEvent.pointerMove(surface, point(3, -130));
+    expect(surface.dataset.intent).toBe("SUPER_LIKE");
+    fireEvent.pointerMove(surface, point(3, 40));
+    expect(surface.style.getPropertyValue("--drag-y")).toBe("0px");
+    expect(surface.dataset.intent).toBe("");
+    fireEvent.pointerUp(surface, point(3, 40));
+    expect(onChoice).not.toHaveBeenCalled();
+  });
+  it.each<[number, number, Choice]>([
+    [-100, 5, "PASS"],
+    [100, 5, "LIKE"],
+    [5, -100, "SUPER_LIKE"],
+  ])(
+    "allows reversing a downward drag into %s, %s before release",
+    (x, y, choice) => {
+      const { surface, onChoice } = card();
+      fireEvent.pointerMove(surface, point(10, 140));
+      expect(onChoice).not.toHaveBeenCalled();
+      fireEvent.pointerMove(surface, point(x, y));
+      fireEvent.pointerUp(surface, point(x, y));
+      expect(onChoice).toHaveBeenCalledExactlyOnceWith(choice);
+    },
+  );
   it.each<[number, number, Choice]>([
     [-90, 0, "PASS"],
     [100, 5, "LIKE"],
@@ -77,19 +121,23 @@ describe("deliberate swipe", () => {
     fireEvent.pointerUp(surface, point(x, y));
     expect(onChoice).toHaveBeenCalledExactlyOnceWith(choice);
     expect(surface.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
-    expect(surface.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+    expect(surface.style.getPropertyValue("--drag-y")).toBe(
+      `${Math.min(y, 0)}px`,
+    );
     fireEvent.lostPointerCapture(surface, point(x, y));
     fireEvent.pointerCancel(surface, point(x, y));
     fireEvent(window, new Event("blur"));
     expect(surface.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
-    expect(surface.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+    expect(surface.style.getPropertyValue("--drag-y")).toBe(
+      `${Math.min(y, 0)}px`,
+    );
   });
   it("holds the final release position rather than the last move", () => {
     const { surface } = card();
     fireEvent.pointerMove(surface, point(95, 0));
-    fireEvent.pointerUp(surface, point(140, 10));
+    fireEvent.pointerUp(surface, point(140, -10));
     expect(surface.style.getPropertyValue("--drag-x")).toBe("140px");
-    expect(surface.style.getPropertyValue("--drag-y")).toBe("10px");
+    expect(surface.style.getPropertyValue("--drag-y")).toBe("-10px");
   });
   it("returns to the center when the submission is not confirmed", async () => {
     const { surface, onChoice } = card();

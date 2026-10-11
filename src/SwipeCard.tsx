@@ -127,8 +127,10 @@ export function SwipeCard({
     el.dataset.dragging = "true";
     el.dataset.intent = intent ?? "";
     const activated = Math.hypot(x, y) >= SWIPE_ACTIVATION;
-    el.style.setProperty("--drag-x", `${activated ? x : 0}px`);
-    el.style.setProperty("--drag-y", `${activated ? y : 0}px`);
+    // Clamp only the presentation; raw displacement keeps downward diagonals neutral.
+    const downward = y > 0 && intent !== "PASS" && intent !== "LIKE";
+    el.style.setProperty("--drag-x", `${activated && !downward ? x : 0}px`);
+    el.style.setProperty("--drag-y", `${activated ? Math.min(y, 0) : 0}px`);
     el.style.setProperty(
       "--drag-rotation",
       `${intent === "PASS" || intent === "LIKE" ? Math.max(-7, Math.min(7, (x / active.width) * 12)) : 0}deg`,
