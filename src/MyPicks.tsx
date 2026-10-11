@@ -13,7 +13,7 @@ import {
   type PendingVote,
 } from "./pendingVotes";
 
-const choices: Choice[] = ["PASS", "LIKE", "SUPER_LIKE"];
+const choices: Choice[] = ["PASS", "SUPER_LIKE", "LIKE"];
 const labels = { PASS: "PASS", LIKE: "LIKE", SUPER_LIKE: "SUPER LIKE" };
 export function MyPicks() {
   const { seasonId = "" } = useParams();
@@ -234,7 +234,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                   <li key={p.id}>
                     <article aria-label={p.title} className="pick-card">
                       <Artwork key={p.id} track={p} />
-                      <div>
+                      <div className="pick-copy">
                         <h2>{p.title}</h2>
                         <p>{p.artists.join(" & ") || "Artist unavailable"}</p>
                         <p>
@@ -246,9 +246,11 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                             preserved.
                           </p>
                         )}
+                      </div>
+                      <div className="pick-controls">
                         <MusicLinks track={p} />
                         <div
-                          className="pick-actions"
+                          className="vote-actions pick-actions"
                           aria-label={`Edit ${p.title}`}
                         >
                           {choices.map((c) => (
