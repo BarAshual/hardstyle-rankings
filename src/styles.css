@@ -518,8 +518,7 @@ select:focus-visible {
   margin: 10px 0 0;
 }
 .rating-message-slot {
-  height: 52px;
-  overflow-y: auto;
+  min-height: 0;
 }
 .rating-message {
   font-size: 13px;
@@ -570,8 +569,11 @@ select:focus-visible {
   -webkit-user-select: none;
 }
 .swipe-card[data-enabled="true"] {
-  touch-action: none;
+  touch-action: pan-y pinch-zoom;
   cursor: grab;
+}
+.swipe-card[data-enabled="true"][data-allow-up="true"] {
+  touch-action: pinch-zoom;
 }
 .swipe-card[data-dragging="true"] {
   transition: none;
@@ -659,7 +661,7 @@ select:focus-visible {
   min-height: 38px;
 }
 .rating-recovery {
-  min-height: 108px;
+  min-height: 0;
 }
 .rating-recovery p {
   margin: 6px 0;
@@ -733,10 +735,116 @@ select:focus-visible {
   }
 }
 @media (max-width: 380px) {
-  .rating-message-slot {
-    height: 52px;
-  }
   .rating .swipe-card .placeholder {
     font-size: 40px;
+  }
+}
+
+/* Fit the voting controls together on phones; overflow remains available for zoom/error recovery. */
+@media (max-width: 600px) {
+  .app:has(.rating) {
+    padding: 0 18px;
+  }
+  .app:has(.rating) > header {
+    height: 56px;
+    flex: 0 0 56px;
+  }
+  main:has(> .rating) {
+    padding: 8px 0 16px;
+  }
+  .app:has(.rating) > footer {
+    display: none;
+  }
+  .rating-context {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .rating-context .back-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .rating-context .eyebrow {
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 1.4;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .rating-progress {
+    min-height: 20px;
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 20px;
+  }
+  .rating-stage {
+    width: min(100%, clamp(160px, calc(100svh - 390px), 320px));
+  }
+  .rating .swipe-card .placeholder {
+    font-size: 22px;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .card-caption {
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .rating-track-copy {
+    height: 64px;
+    margin-top: 8px;
+  }
+  .rating .track-title {
+    font-size: 26px;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+    margin: 0 0 4px;
+  }
+  .rating-track-copy .track-artists {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .rating .music-links {
+    margin: 8px 0;
+  }
+  .rating .music-caption {
+    font-size: 11px;
+    line-height: 16px;
+    margin-bottom: 4px;
+  }
+  .rating .music-link,
+  .rating .music-unavailable {
+    height: 48px;
+  }
+  .rating .music-actions {
+    gap: 8px;
+  }
+  .vote-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .vote-actions button {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+  .vote-actions .super {
+    grid-column: auto;
+  }
+  .swipe-hint {
+    min-height: 0;
+    font-size: 11px;
+    line-height: 18px;
+    margin: 6px 0 0;
+  }
+  .rating-save-note {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 }

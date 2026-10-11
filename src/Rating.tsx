@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "./auth";
 import { uuidPattern, type Choice, type Home, type Track } from "./api";
@@ -36,6 +36,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
   const [attempt, setAttempt] = useState(0);
   const [exit, setExit] = useState<Choice | null>(null);
   const [entering, setEntering] = useState(false);
+  const [allowUp, setAllowUp] = useState(false);
   const departure = useRef<Choice | null>(null);
   const submitting = useRef(false);
   const mounted = useRef(false);
@@ -112,6 +113,30 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       resolveExit();
     };
   }, [api, seasonId, user, attempt]);
+
+  useLayoutEffect(() => {
+    // Native vertical scrolling takes priority whenever the page exceeds the visible viewport.
+    const measure = () => {
+      const height = Math.min(
+        window.innerHeight,
+        window.visualViewport?.height ?? window.innerHeight,
+      );
+      setAllowUp(document.documentElement.scrollHeight <= height + 1);
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
+    observer?.observe(document.body);
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, []);
 
   function refresh() {
     if (submitting.current) return;
@@ -213,25 +238,17 @@ function RatingSession({ seasonId }: { seasonId: string }) {
   const terminal = ready && !pending && (closed || !track);
   return (
     <section className="rating">
-      <Link to={`/seasons/${seasonId}`} className="back-link">
-        ← Season home
-      </Link>
-      <p className="eyebrow">{home?.season.name ?? "Your season"}</p>
+      <div className="rating-context">
+        <Link to={`/seasons/${seasonId}`} className="back-link">
+          ← Season home
+        </Link>
+        <p className="eyebrow">{home?.season.name ?? "Your season"}</p>
+      </div>
       <p className="rating-progress">
         {home
           ? `${home.progress.rated} / ${home.progress.active_tracks} rated · ${home.progress.super_likes_available} Super Likes remaining`
           : "Loading your latest progress…"}
       </p>
-      <div className="rating-message-slot">
-        <p
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className={success ? "sr-only" : "rating-message"}
-        >
-          {message}
-        </p>
-      </div>
       <div className="rating-stage" aria-busy={busy || !ready}>
         {terminal ? (
           <div className="rating-stage-message">
@@ -254,6 +271,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
             key={track.id}
             track={track}
             enabled={enabled}
+            allowUp={allowUp}
             saving={busy}
             exit={exit}
             entering={entering}
@@ -282,11 +300,6 @@ function RatingSession({ seasonId }: { seasonId: string }) {
         )}
       </div>
       <MusicLinks track={track} />
-      <p id="swipe-hint" className="swipe-hint">
-        ← PASS · LIKE → · ↑ SUPER LIKE
-        <br />
-        Swipe the card or use the buttons below.
-      </p>
       <div className="vote-actions">
         <button disabled={!enabled} onClick={() => void submit("PASS")}>
           ← PASS
@@ -306,6 +319,21 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           ↑ SUPER LIKE
         </button>
       </div>
+      <p id="swipe-hint" className="swipe-hint">
+        {allowUp
+          ? "Swipe ← Pass · Like → · ↑ Super Like"
+          : "Swipe ← or → · Super Like with the button"}
+      </p>
+      <div className="rating-message-slot">
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={success || busy || !message ? "sr-only" : "rating-message"}
+        >
+          {message}
+        </p>
+      </div>
       <div className="rating-recovery">
         {pending && (
           <>
@@ -322,7 +350,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           </>
         )}
       </div>
-      <p className="fine">
+      <p className="fine rating-save-note">
         Your choice is saved before the next track appears.
       </p>
     </section>

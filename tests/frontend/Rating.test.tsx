@@ -551,3 +551,87 @@ describe("swipe submission and stable transitions", () => {
     expect(api.castVote).not.toHaveBeenCalled();
   });
 });
+
+describe("adaptive scrolling and voting", () => {
+  it("never journals a vertical scroll, while keeping horizontal swipes and the Super Like button", async () => {
+    const height = vi
+      .spyOn(document.documentElement, "scrollHeight", "get")
+      .mockReturnValue(1200);
+    try {
+      const { api, votes } = fake();
+      mount(api);
+      await screen.findByRole("heading", { name: "Track 1" });
+      const card = swipe(0, -140);
+      expect(card).toHaveAttribute("data-allow-up", "false");
+      expect(api.castVote).not.toHaveBeenCalled();
+      expect(readPending(uid, sid)).toBeNull();
+      expect(
+        screen.getByText(/Super Like with the button/),
+      ).toBeInTheDocument();
+      swipe(100, 0);
+      await screen.findByRole("heading", { name: "Track 2" });
+      expect(votes.get(tracks[0].id)).toBe("LIKE");
+      await userEvent.click(button("SUPER_LIKE"));
+      await screen.findByRole("heading", { name: "Track 3" });
+      expect(votes.get(tracks[1].id)).toBe("SUPER_LIKE");
+      expect(button("SUPER_LIKE")).toBeDisabled();
+      expect(api.castVote).toHaveBeenCalledTimes(2);
+    } finally {
+      height.mockRestore();
+    }
+  });
+  it("cancels an active swipe on overflow and restores upward gestures only after the page fits again", async () => {
+    const height = vi
+      .spyOn(document.documentElement, "scrollHeight", "get")
+      .mockReturnValue(500);
+    try {
+      const { api } = fake();
+      mount(api);
+      await screen.findByRole("heading", { name: "Track 1" });
+      const card = screen.getByRole("group", { name: /Swipe to rate/ });
+      expect(card).toHaveAttribute("data-allow-up", "true");
+      fireEvent.pointerDown(card, pointer(0, 0));
+      fireEvent.pointerMove(card, pointer(0, -140));
+      height.mockReturnValue(1200);
+      fireEvent(window, new Event("resize"));
+      expect(card).toHaveAttribute("data-allow-up", "false");
+      fireEvent.pointerUp(card, pointer(0, -140));
+      expect(api.castVote).not.toHaveBeenCalled();
+      height.mockReturnValue(500);
+      fireEvent(window, new Event("resize"));
+      swipe(0, -140);
+      await screen.findByRole("heading", { name: "Track 2" });
+      expect(api.castVote).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ choice: "SUPER_LIKE" }),
+      );
+    } finally {
+      height.mockRestore();
+    }
+  });
+  it("uses the smaller visible viewport when browser chrome or zoom leaves less room", async () => {
+    const height = vi
+      .spyOn(document.documentElement, "scrollHeight", "get")
+      .mockReturnValue(600);
+    const original = Object.getOwnPropertyDescriptor(window, "visualViewport");
+    const viewport = Object.assign(new EventTarget(), { height: 400 });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: viewport,
+    });
+    try {
+      const { api } = fake();
+      mount(api);
+      await screen.findByRole("heading", { name: "Track 1" });
+      const card = swipe(0, -140);
+      expect(card).toHaveAttribute("data-allow-up", "false");
+      expect(api.castVote).not.toHaveBeenCalled();
+      viewport.height = 700;
+      act(() => viewport.dispatchEvent(new Event("resize")));
+      expect(card).toHaveAttribute("data-allow-up", "true");
+    } finally {
+      height.mockRestore();
+      if (original) Object.defineProperty(window, "visualViewport", original);
+      else Reflect.deleteProperty(window, "visualViewport");
+    }
+  });
+});

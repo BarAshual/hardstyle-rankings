@@ -17,6 +17,7 @@ type Drag = { id: number; x: number; y: number; width: number; height: number };
 export function SwipeCard({
   track,
   enabled,
+  allowUp,
   saving,
   exit,
   entering,
@@ -25,6 +26,7 @@ export function SwipeCard({
 }: {
   track: Track;
   enabled: boolean;
+  allowUp: boolean;
   saving: boolean;
   exit: Choice | null;
   entering: boolean;
@@ -93,6 +95,10 @@ export function SwipeCard({
   useEffect(() => {
     if (!enabled) cancelDrag();
   }, [enabled, cancelDrag]);
+  useEffect(() => {
+    // A viewport change cannot turn an in-progress scroll into a vote.
+    cancelDrag();
+  }, [allowUp, cancelDrag]);
 
   function start(e: ReactPointerEvent<HTMLDivElement>) {
     if (!enabled || e.button !== 0 || touches.current.size > 1 || !e.isPrimary)
@@ -122,15 +128,23 @@ export function SwipeCard({
     const x = e.clientX - active.x,
       y = e.clientY - active.y;
     const intent = swipeIntent(x, y);
+    const activated = Math.hypot(x, y) >= SWIPE_ACTIVATION;
+    if (!allowUp && activated && intent !== "PASS" && intent !== "LIKE") {
+      // Yield the entire gesture to native scrolling, including later sideways drift.
+      reset();
+      return;
+    }
     const threshold = swipeThresholds(active.width, active.height);
     const el = e.currentTarget;
     el.dataset.dragging = "true";
     el.dataset.intent = intent ?? "";
-    const activated = Math.hypot(x, y) >= SWIPE_ACTIVATION;
     // Clamp only the presentation; raw displacement keeps downward diagonals neutral.
     const downward = y > 0 && intent !== "PASS" && intent !== "LIKE";
     el.style.setProperty("--drag-x", `${activated && !downward ? x : 0}px`);
-    el.style.setProperty("--drag-y", `${activated ? Math.min(y, 0) : 0}px`);
+    el.style.setProperty(
+      "--drag-y",
+      `${activated && allowUp ? Math.min(y, 0) : 0}px`,
+    );
     el.style.setProperty(
       "--drag-rotation",
       `${intent === "PASS" || intent === "LIKE" ? Math.max(-7, Math.min(7, (x / active.width) * 12)) : 0}deg`,
@@ -160,7 +174,7 @@ export function SwipeCard({
           active.height,
         )
       : null;
-    if (!choice) {
+    if (!choice || (!allowUp && choice === "SUPER_LIKE")) {
       reset();
       return;
     }
@@ -180,6 +194,7 @@ export function SwipeCard({
       aria-label={`Swipe to rate ${track.title}`}
       aria-describedby="swipe-hint"
       data-enabled={enabled}
+      data-allow-up={allowUp}
       data-exit={exit ?? ""}
       data-entering={entering}
       onPointerDown={start}
@@ -201,7 +216,9 @@ export function SwipeCard({
           ? "Saving your choice…"
           : exit
             ? "Confirmed"
-            : "Drag the card · release to choose"}
+            : allowUp
+              ? "Drag the card · release to choose"
+              : "Swipe left or right · scroll normally"}
       </p>
     </div>
   );

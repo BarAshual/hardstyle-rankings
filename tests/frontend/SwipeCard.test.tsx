@@ -19,12 +19,13 @@ const point = (x: number, y: number, pointerId = 1) => ({
   isPrimary: pointerId === 1,
   button: 0,
 });
-function card(enabled = true) {
+function card(enabled = true, allowUp = true) {
   const onChoice = vi.fn().mockResolvedValue(true);
   const view = render(
     <SwipeCard
       track={track}
       enabled={enabled}
+      allowUp={allowUp}
       saving={false}
       exit={null}
       entering={false}
@@ -219,5 +220,62 @@ describe("deliberate swipe", () => {
     expect(swipeThresholds(100, 100)).toEqual({ horizontal: 72, up: 80 });
     expect(swipeThresholds(1000, 1000)).toEqual({ horizontal: 120, up: 130 });
     expect(releasedChoice(130, -130, 320, 360)).toBeNull();
+  });
+});
+
+describe("scroll-safe swipe mode", () => {
+  it.each([
+    [0, -140],
+    [0, 140],
+    [110, -100],
+  ])(
+    "yields vertical or ambiguous displacement %s, %s without a vote",
+    (x, y) => {
+      const { surface, onChoice } = card(true, false);
+      fireEvent.pointerMove(surface, point(x, y));
+      expect(surface.dataset.intent).toBe("");
+      expect(surface.style.getPropertyValue("--drag-y")).toBe("0px");
+      // Later sideways drift is still part of the same scroll, never a fresh swipe.
+      fireEvent.pointerMove(surface, point(150, 0));
+      fireEvent.pointerUp(surface, point(150, 0));
+      expect(onChoice).not.toHaveBeenCalled();
+    },
+  );
+  it("rejects upward release even without an intervening move event", () => {
+    const { surface, onChoice } = card(true, false);
+    fireEvent.pointerUp(surface, point(0, -140));
+    expect(onChoice).not.toHaveBeenCalled();
+  });
+  it.each<[number, Choice]>([
+    [-100, "PASS"],
+    [100, "LIKE"],
+  ])(
+    "preserves deliberate horizontal choice %s, %s while allowing scrolling",
+    (x, choice) => {
+      const { surface, onChoice } = card(true, false);
+      fireEvent.pointerMove(surface, point(x, -10));
+      fireEvent.pointerUp(surface, point(x, -10));
+      expect(onChoice).toHaveBeenCalledExactlyOnceWith(choice);
+      expect(surface.style.getPropertyValue("--drag-y")).toBe("0px");
+    },
+  );
+  it("cancels an active swipe when the viewport requires scrolling", () => {
+    const { surface, onChoice, view } = card();
+    fireEvent.pointerMove(surface, point(0, -140));
+    view.rerender(
+      <SwipeCard
+        track={track}
+        enabled
+        allowUp={false}
+        saving={false}
+        exit={null}
+        entering={false}
+        onEntered={() => {}}
+        onChoice={onChoice}
+      />,
+    );
+    fireEvent.pointerUp(surface, point(0, -140));
+    expect(onChoice).not.toHaveBeenCalled();
+    expect(surface.style.getPropertyValue("--drag-y")).toBe("0px");
   });
 });
