@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
@@ -28,38 +29,47 @@ export function SwipeCard({
   exit: Choice | null;
   entering: boolean;
   onEntered: () => void;
-  onChoice: (choice: Choice) => void;
+  onChoice: (choice: Choice) => Promise<boolean>;
 }) {
   const surface = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const touches = useRef(new Set<number>());
-  function reset() {
+  const stopDrag = useCallback(() => {
     const active = drag.current;
     drag.current = null; // Clear before releasing capture; lostcapture must never commit.
     const el = surface.current;
     if (!el) return;
     el.dataset.dragging = "false";
+    if (active && el.hasPointerCapture?.(active.id))
+      el.releasePointerCapture(active.id);
+  }, []);
+  const reset = useCallback(() => {
+    stopDrag();
+    const el = surface.current;
+    if (!el) return;
     el.dataset.intent = "";
     el.style.setProperty("--drag-x", "0px");
     el.style.setProperty("--drag-y", "0px");
     el.style.setProperty("--drag-rotation", "0deg");
     el.style.setProperty("--intent-strength", "0");
-    if (active && el.hasPointerCapture?.(active.id))
-      el.releasePointerCapture(active.id);
-  }
+  }, [stopDrag]);
+  const cancelDrag = useCallback(() => {
+    // After release, capture loss/blur cannot rewind an already submitted card.
+    if (drag.current) reset();
+  }, [reset]);
   useEffect(() => {
     // A second finger anywhere on the document cancels, including outside this surface.
     const down = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touches.current.add(e.pointerId);
-      if (touches.current.size > 1) reset();
+      if (touches.current.size > 1) cancelDrag();
     };
     const end = (e: PointerEvent) => {
       touches.current.delete(e.pointerId);
     };
     const cancel = () => {
       touches.current.clear();
-      reset();
+      cancelDrag();
     };
     const hidden = () => {
       if (document.visibilityState === "hidden") cancel();
@@ -79,10 +89,10 @@ export function SwipeCard({
       window.removeEventListener("pagehide", cancel);
       reset();
     };
-  }, []);
+  }, [cancelDrag, reset]);
   useEffect(() => {
-    if (!enabled) reset();
-  }, [enabled]);
+    if (!enabled) cancelDrag();
+  }, [enabled, cancelDrag]);
 
   function start(e: ReactPointerEvent<HTMLDivElement>) {
     if (!enabled || e.button !== 0 || touches.current.size > 1 || !e.isPrimary)
@@ -148,8 +158,17 @@ export function SwipeCard({
           active.height,
         )
       : null;
-    reset();
-    if (choice) onChoice(choice);
+    if (!choice) {
+      reset();
+      return;
+    }
+    // Use the final release position, even when it differs from the last move.
+    // Hold it through saving; the confirmed exit continues from these offsets.
+    move(e);
+    stopDrag();
+    void onChoice(choice).then((confirmed) => {
+      if (!confirmed) reset();
+    }, reset);
   }
   return (
     <div
@@ -164,8 +183,8 @@ export function SwipeCard({
       onPointerDown={start}
       onPointerMove={move}
       onPointerUp={release}
-      onPointerCancel={reset}
-      onLostPointerCapture={reset}
+      onPointerCancel={cancelDrag}
+      onLostPointerCapture={cancelDrag}
       onDragStart={(e) => e.preventDefault()}
       onAnimationEnd={onEntered}
     >

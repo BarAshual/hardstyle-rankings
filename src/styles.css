@@ -13,6 +13,10 @@
 body {
   margin: 0;
 }
+/* Clip outgoing cards at the viewport, without creating a vertical scroll container. */
+#root:has(.rating) {
+  overflow-x: clip;
+}
 button,
 input {
   font: inherit;
@@ -539,8 +543,8 @@ select:focus-visible {
   aspect-ratio: 1;
   margin: 0 auto;
   position: relative;
-  /* Confine dragged/outgoing cards without disabling page scrolling. */
-  overflow: clip;
+  /* Let confirmed cards leave the frame and travel to the viewport edge. */
+  overflow: visible;
   border-radius: 12px;
 }
 .swipe-card {
@@ -560,6 +564,8 @@ select:focus-visible {
   transform: translate(var(--drag-x), var(--drag-y))
     rotate(var(--drag-rotation));
   transition: transform 210ms ease-out;
+  position: relative;
+  z-index: 1;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -677,20 +683,35 @@ select:focus-visible {
   animation: card-enter 180ms ease-out;
 }
 @keyframes card-pass {
+  from {
+    transform: translate(var(--drag-x), var(--drag-y))
+      rotate(var(--drag-rotation));
+    opacity: 1;
+  }
   to {
-    transform: translateX(-110%) rotate(-7deg);
+    transform: translate(calc(-100vw - 100%), var(--drag-y)) rotate(-7deg);
     opacity: 0;
   }
 }
 @keyframes card-like {
+  from {
+    transform: translate(var(--drag-x), var(--drag-y))
+      rotate(var(--drag-rotation));
+    opacity: 1;
+  }
   to {
-    transform: translateX(110%) rotate(7deg);
+    transform: translate(calc(100vw + 100%), var(--drag-y)) rotate(7deg);
     opacity: 0;
   }
 }
 @keyframes card-super {
+  from {
+    transform: translate(var(--drag-x), var(--drag-y))
+      rotate(var(--drag-rotation));
+    opacity: 1;
+  }
   to {
-    transform: translateY(-110%);
+    transform: translate(var(--drag-x), calc(-100vh - 100%));
     opacity: 0;
   }
 }

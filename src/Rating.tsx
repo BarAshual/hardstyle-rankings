@@ -120,7 +120,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
     setReadError(false);
     setAttempt((n) => n + 1);
   }
-  async function submit(choice?: Choice) {
+  async function submit(choice?: Choice): Promise<boolean> {
     if (
       submitting.current ||
       !ready ||
@@ -128,7 +128,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       (choice && pending) ||
       (!pending && home?.season.state !== "VOTING")
     )
-      return;
+      return false;
     if (
       !pending &&
       choice === "SUPER_LIKE" &&
@@ -136,7 +136,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
     ) {
       setSuccess(false);
       setMessage(rejected.super_like_limit);
-      return;
+      return false;
     }
     submitting.current = true; // Synchronous guard covers repeated release/click events.
     setBusy(true);
@@ -165,11 +165,11 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       );
       submitting.current = false;
       setBusy(false);
-      return;
+      return false;
     }
     try {
       await confirmPending(api, actionPending);
-      if (!mounted.current) return;
+      if (!mounted.current) return false;
       setPending(null);
       setReady(false);
       setSuccess(true);
@@ -177,8 +177,9 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       departure.current = actionPending.action.choice;
       setExit(actionPending.action.choice);
       setAttempt((n) => n + 1);
+      return true;
     } catch (error) {
-      if (!mounted.current) return;
+      if (!mounted.current) return false;
       const code =
         error && typeof error === "object" && "message" in error
           ? String(error.message)
@@ -201,6 +202,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           "We couldn’t confirm this vote. Retry the same action safely—even if it already reached the server. You can also sign in again if your session expired.",
         );
       }
+      return false;
     } finally {
       submitting.current = false;
       if (mounted.current) setBusy(false);
@@ -256,7 +258,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
             exit={exit}
             entering={entering}
             onEntered={() => setEntering(false)}
-            onChoice={(c) => void submit(c)}
+            onChoice={submit}
           />
         ) : (
           <div className="rating-stage-message">

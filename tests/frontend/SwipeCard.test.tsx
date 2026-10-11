@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SwipeCard } from "../../src/SwipeCard";
 import { releasedChoice, swipeThresholds } from "../../src/swipe";
@@ -20,7 +20,7 @@ const point = (x: number, y: number, pointerId = 1) => ({
   button: 0,
 });
 function card(enabled = true) {
-  const onChoice = vi.fn();
+  const onChoice = vi.fn().mockResolvedValue(true);
   const view = render(
     <SwipeCard
       track={track}
@@ -76,6 +76,30 @@ describe("deliberate swipe", () => {
     fireEvent.pointerUp(surface, point(x, y));
     fireEvent.pointerUp(surface, point(x, y));
     expect(onChoice).toHaveBeenCalledExactlyOnceWith(choice);
+    expect(surface.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
+    expect(surface.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+    fireEvent.lostPointerCapture(surface, point(x, y));
+    fireEvent.pointerCancel(surface, point(x, y));
+    fireEvent(window, new Event("blur"));
+    expect(surface.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
+    expect(surface.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+  });
+  it("holds the final release position rather than the last move", () => {
+    const { surface } = card();
+    fireEvent.pointerMove(surface, point(95, 0));
+    fireEvent.pointerUp(surface, point(140, 10));
+    expect(surface.style.getPropertyValue("--drag-x")).toBe("140px");
+    expect(surface.style.getPropertyValue("--drag-y")).toBe("10px");
+  });
+  it("returns to the center when the submission is not confirmed", async () => {
+    const { surface, onChoice } = card();
+    onChoice.mockResolvedValueOnce(false);
+    fireEvent.pointerMove(surface, point(120, 0));
+    fireEvent.pointerUp(surface, point(120, 0));
+    await waitFor(() =>
+      expect(surface.style.getPropertyValue("--drag-x")).toBe("0px"),
+    );
+    expect(surface.dataset.intent).toBe("");
   });
   it("uses the final release position and direction, not the last move or speed", () => {
     const { surface, onChoice } = card();

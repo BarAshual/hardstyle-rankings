@@ -390,32 +390,45 @@ describe("swipe submission and stable transitions", () => {
       });
     },
   );
-  it("holds the card and progress while saving, then exits only after a matching receipt", async () => {
-    const { api, votes } = fake();
-    let resolve!: (r: Awaited<ReturnType<API["castVote"]>>) => void;
-    api.castVote.mockImplementation(
-      () =>
-        new Promise((r) => {
-          resolve = r;
-        }),
-    );
-    const { container } = mount(api);
-    await screen.findByRole("heading", { name: "Track 1" });
-    const stage = container.querySelector(".rating-stage");
-    const actions = container.querySelector(".vote-actions");
-    const card = swipe(100, 0);
-    expect(card).toHaveAttribute("data-exit", "");
-    expect(screen.getByText(/0 \/ 3 rated/)).toBeInTheDocument();
-    expect(api.nextTrack).toHaveBeenCalledOnce();
-    const a = api.castVote.mock.calls[0][0];
-    votes.set(a.track_id, a.choice);
-    await act(async () => resolve({ ...a, version: 1, accepted_at: "now" }));
-    expect(card).toHaveAttribute("data-exit", "LIKE");
-    expect(button("LIKE")).toBeDisabled();
-    await screen.findByRole("heading", { name: "Track 2" });
-    expect(container.querySelector(".rating-stage")).toBe(stage);
-    expect(container.querySelector(".vote-actions")).toBe(actions);
-  });
+  it.each<[number, number, Choice]>([
+    [-100, 5, "PASS"],
+    [100, 5, "LIKE"],
+    [5, -100, "SUPER_LIKE"],
+  ])(
+    "holds the released card while saving, then exits %s, %s after confirmation",
+    async (x, y, choice) => {
+      const { api, votes } = fake();
+      let resolve!: (r: Awaited<ReturnType<API["castVote"]>>) => void;
+      api.castVote.mockImplementation(
+        () =>
+          new Promise((r) => {
+            resolve = r;
+          }),
+      );
+      const { container } = mount(api);
+      await screen.findByRole("heading", { name: "Track 1" });
+      const stage = container.querySelector(".rating-stage");
+      const actions = container.querySelector(".vote-actions");
+      const card = swipe(x, y);
+      expect(card).toHaveAttribute("data-exit", "");
+      expect(card.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
+      expect(card.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+      fireEvent.lostPointerCapture(card, pointer(x, y));
+      expect(card.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
+      expect(screen.getByText(/0 \/ 3 rated/)).toBeInTheDocument();
+      expect(api.nextTrack).toHaveBeenCalledOnce();
+      const a = api.castVote.mock.calls[0][0];
+      votes.set(a.track_id, a.choice);
+      await act(async () => resolve({ ...a, version: 1, accepted_at: "now" }));
+      expect(card).toHaveAttribute("data-exit", choice);
+      expect(card.style.getPropertyValue("--drag-x")).toBe(`${x}px`);
+      expect(card.style.getPropertyValue("--drag-y")).toBe(`${y}px`);
+      expect(button("LIKE")).toBeDisabled();
+      await screen.findByRole("heading", { name: "Track 2" });
+      expect(container.querySelector(".rating-stage")).toBe(stage);
+      expect(container.querySelector(".vote-actions")).toBe(actions);
+    },
+  );
   it("retains a pending swipe and its context on a mismatched receipt", async () => {
     const { api } = fake();
     api.castVote.mockImplementationOnce(async (a) => ({
@@ -438,7 +451,10 @@ describe("swipe submission and stable transitions", () => {
     votes.set(tracks[2].id, "SUPER_LIKE");
     mount(api);
     await screen.findByRole("heading", { name: "Track 1" });
-    swipe(0, -120);
+    const card = swipe(0, -120);
+    await waitFor(() =>
+      expect(card.style.getPropertyValue("--drag-y")).toBe("0px"),
+    );
     expect(screen.getByText(/used all your Super Likes/)).toBeInTheDocument();
     expect(api.castVote).not.toHaveBeenCalled();
     expect(button("SUPER_LIKE")).toBeDisabled();
