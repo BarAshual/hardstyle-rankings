@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { App } from "../../src/App";
 import { musicURL } from "../../src/Rating";
 import { readPending, savePending } from "../../src/pendingVotes";
+import { EXIT_MS } from "../../src/swipe";
 import type { API, Choice, Home, Track, VoteAction } from "../../src/api";
 const sid = "20000000-0000-0000-0000-000000000001";
 const uid = "10000000-0000-0000-0000-000000000001";
@@ -479,10 +480,54 @@ describe("swipe submission and stable transitions", () => {
     expect(api.castVote).toHaveBeenCalledOnce();
     expect(readPending(uid, sid)).toBeNull();
   });
+  it("does not flash the loader or delay a fast next track after the exit", async () => {
+    const { api } = fake();
+    let resolve!: (track: Track) => void;
+    const { container } = mount(api);
+    await screen.findByRole("heading", { name: "Track 1" });
+    api.nextTrack.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(button("LIKE"));
+      await act(async () => {});
+      await act(async () => {
+        vi.advanceTimersByTime(EXIT_MS);
+      });
+      expect(container.querySelector(".rating-loading")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("status", { name: "Loading your next track" }),
+      ).not.toBeInTheDocument();
+      await act(async () => {
+        vi.advanceTimersByTime(250);
+      });
+      await act(async () => resolve(tracks[1]));
+      expect(
+        screen.getByRole("heading", { name: "Track 2" }),
+      ).toBeInTheDocument();
+      expect(button("LIKE")).toBeEnabled();
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(
+        container.querySelector(".rating-loading"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("status", { name: "Loading your next track" }),
+      ).not.toBeInTheDocument();
+      expect(api.castVote).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("waits within the card slot for a slow next read and retries a failed read only", async () => {
     const { api } = fake();
     let reject!: (e: Error) => void;
-    mount(api);
+    const { container } = mount(api);
     await screen.findByRole("heading", { name: "Track 1" });
     api.nextTrack.mockImplementationOnce(
       () =>
@@ -490,11 +535,41 @@ describe("swipe submission and stable transitions", () => {
           reject = r;
         }),
     );
-    swipe(-100, 0);
-    await screen.findByText("Loading your next track…");
-    expect(button("PASS")).toBeDisabled();
-    expect(readPending(uid, sid)).toBeNull();
-    await act(async () => reject(new Error("read failed")));
+    vi.useFakeTimers();
+    try {
+      swipe(-100, 0);
+      await act(async () => {});
+      await act(async () => {
+        vi.advanceTimersByTime(EXIT_MS);
+      });
+      const stage = container.querySelector(".rating-stage");
+      expect(stage).toHaveAttribute("aria-busy", "true");
+      await act(async () => {
+        vi.advanceTimersByTime(499);
+      });
+      expect(
+        screen.queryByRole("status", { name: "Loading your next track" }),
+      ).not.toBeInTheDocument();
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(
+        screen.getByRole("status", { name: "Loading your next track" }),
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector(".rating-loading .wordmark"),
+      ).toHaveTextContent("HS/26");
+      expect(container.querySelector(".rating-stage")).toBe(stage);
+      expect(button("PASS")).toBeDisabled();
+      expect(readPending(uid, sid)).toBeNull();
+      await act(async () => reject(new Error("read failed")));
+      expect(
+        screen.queryByRole("status", { name: "Loading your next track" }),
+      ).not.toBeInTheDocument();
+      expect(stage).toHaveAttribute("aria-busy", "false");
+    } finally {
+      vi.useRealTimers();
+    }
     await screen.findByRole("button", { name: "Try again" });
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByRole("heading", { name: "Track 2" });

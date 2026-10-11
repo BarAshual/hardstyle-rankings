@@ -659,6 +659,40 @@ select:focus-visible {
 .rating .track-title {
   margin-top: 4px;
 }
+.rating-loading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.rating-loading-emblem {
+  position: relative;
+  width: 108px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+.rating-loading-emblem::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid #d8ee6926;
+  border-top-color: #d8ee69;
+  border-radius: 50%;
+  animation: rating-loading-spin 1s linear infinite;
+}
+.rating-loading-emblem .wordmark {
+  font-size: 27px;
+}
+@keyframes rating-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rating-loading-emblem::before {
+    animation: none;
+  }
+}
 .rating-stage-message {
   height: 100%;
   display: flex;

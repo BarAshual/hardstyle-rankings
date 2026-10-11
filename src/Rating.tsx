@@ -22,6 +22,32 @@ export function Rating() {
     <RatingSession key={`${identity!.id}:${seasonId}`} seasonId={seasonId} />
   );
 }
+function RatingLoader() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    // Fast reads leave this stable slot empty instead of flashing a loading state.
+    const timer = setTimeout(() => setVisible(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div className="rating-loading">
+      {visible && (
+        <div
+          className="rating-loading-indicator"
+          role="status"
+          aria-label="Loading your next track"
+        >
+          <div className="rating-loading-emblem" aria-hidden="true">
+            <span className="wordmark">
+              HS<span>/</span>26
+            </span>
+          </div>
+          <span className="sr-only">Loading your next track…</span>
+        </div>
+      )}
+    </div>
+  );
+}
 function RatingSession({ seasonId }: { seasonId: string }) {
   const { api, identity } = useAuth();
   const user = identity!.id;
@@ -250,7 +276,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           ? `${home.progress.rated} / ${home.progress.active_tracks} rated · ${home.progress.super_likes_available} Super Likes remaining`
           : "Loading your latest progress…"}
       </p>
-      <div className="rating-stage" aria-busy={busy || !ready}>
+      <div className="rating-stage" aria-busy={busy || (!ready && !readError)}>
         {terminal ? (
           <div className="rating-stage-message">
             <h1>
@@ -279,15 +305,13 @@ function RatingSession({ seasonId }: { seasonId: string }) {
             onEntered={() => setEntering(false)}
             onChoice={submit}
           />
-        ) : (
+        ) : readError ? (
           <div className="rating-stage-message">
-            <p>
-              {readError
-                ? "The next track is unavailable right now."
-                : "Loading your next track…"}
-            </p>
-            {readError && <button onClick={refresh}>Try again</button>}
+            <p>The next track is unavailable right now.</p>
+            <button onClick={refresh}>Try again</button>
           </div>
+        ) : (
+          <RatingLoader />
         )}
       </div>
       <div className="rating-track-copy">
