@@ -411,6 +411,25 @@ select:focus-visible {
   list-style: none;
   padding: 0;
 }
+.picks-count {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  color: #b4b4bd;
+  scroll-margin-top: 16px;
+}
+.picks-pagination {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  text-align: center;
+  font-size: 13px;
+}
+.picks-pagination button {
+  padding: 8px 4px;
+  font-size: 13px;
+}
 .pick-card {
   border-top: 1px solid #38383e;
   padding: 24px 0;
