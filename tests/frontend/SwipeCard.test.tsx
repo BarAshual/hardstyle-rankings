@@ -26,7 +26,6 @@ function card(enabled = true, allowUp = true) {
       track={track}
       enabled={enabled}
       allowUp={allowUp}
-      saving={false}
       exit={null}
       entering={false}
       onEntered={() => {}}
@@ -206,13 +205,10 @@ describe("deliberate swipe", () => {
     fireEvent.pointerUp(surface, point(120, 0));
     expect(onChoice).not.toHaveBeenCalled();
   });
-  it("keeps the feedback outside artwork and limits horizontal rotation", () => {
+  it("limits horizontal rotation and keeps upward intent unrotated", () => {
     const { surface } = card();
     fireEvent.pointerMove(surface, point(500, 0));
     expect(surface.style.getPropertyValue("--drag-rotation")).toBe("7deg");
-    expect(screen.getByRole("img")).not.toContainElement(
-      surface.querySelector(".swipe-feedback"),
-    );
     fireEvent.pointerMove(surface, point(20, -120));
     expect(surface.style.getPropertyValue("--drag-rotation")).toBe("0deg");
   });
@@ -267,7 +263,6 @@ describe("scroll-safe swipe mode", () => {
         track={track}
         enabled
         allowUp={false}
-        saving={false}
         exit={null}
         entering={false}
         onEntered={() => {}}

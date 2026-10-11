@@ -369,11 +369,10 @@ footer {
 }
 .vote-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 .vote-actions .super {
-  grid-column: 1 / -1;
   border-color: #d8ee69;
   color: #d8ee69;
 }
@@ -553,13 +552,8 @@ select:focus-visible {
   --intent-strength: 0;
   width: 100%;
   height: 100%;
-  border: 1px solid #55555a;
-  border-radius: 12px;
-  background: #19191d;
-  padding: 8px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  border: 0;
+  padding: 0;
   transform: translate(var(--drag-x), var(--drag-y))
     rotate(var(--drag-rotation));
   transition: transform 210ms ease-out;
@@ -580,10 +574,9 @@ select:focus-visible {
   cursor: grabbing;
 }
 .swipe-feedback {
-  position: relative;
-  height: 28px;
-  flex: 0 0 28px;
-  width: 100%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 .swipe-feedback span {
   position: absolute;
@@ -593,34 +586,27 @@ select:focus-visible {
   font-size: 14px;
   opacity: 0;
 }
-.swipe-card[data-intent="PASS"] .intent-pass {
+.swipe-feedback[data-intent="PASS"] .intent-pass {
   color: #ffd4cb;
   opacity: var(--intent-strength);
 }
-.swipe-card[data-intent="LIKE"] .intent-like {
+.swipe-feedback[data-intent="LIKE"] .intent-like {
   color: #d8ee69;
   opacity: var(--intent-strength);
 }
-.swipe-card[data-intent="SUPER_LIKE"] .intent-super {
+.swipe-feedback[data-intent="SUPER_LIKE"] .intent-super {
   color: #b9c7ff;
   opacity: var(--intent-strength);
 }
 .rating .swipe-card .track-art {
-  width: auto;
-  height: calc(100% - 56px);
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: none;
   margin: 0;
-  flex: 0 0 auto;
-  border-radius: 6px;
+  border-radius: 8px;
   object-fit: contain;
   pointer-events: none;
-}
-.card-caption {
-  font-size: 11px;
-  line-height: 20px;
-  margin: 4px 0 0;
-  color: #b4b4bd;
 }
 .rating-track-copy {
   height: 104px;
@@ -655,10 +641,17 @@ select:focus-visible {
   margin: 4px 0 16px;
 }
 .swipe-hint {
+  position: relative;
   text-align: center;
   font-size: 12px;
   color: #b4b4bd;
   min-height: 38px;
+  margin: 12px 0;
+}
+.swipe-hint:has(.swipe-feedback[data-intent="PASS"]) .swipe-instruction,
+.swipe-hint:has(.swipe-feedback[data-intent="LIKE"]) .swipe-instruction,
+.swipe-hint:has(.swipe-feedback[data-intent="SUPER_LIKE"]) .swipe-instruction {
+  visibility: hidden;
 }
 .rating-recovery {
   min-height: 0;
@@ -734,12 +727,6 @@ select:focus-visible {
     animation: none !important;
   }
 }
-@media (max-width: 380px) {
-  .rating .swipe-card .placeholder {
-    font-size: 40px;
-  }
-}
-
 /* Fit the voting controls together on phones; overflow remains available for zoom/error recovery. */
 @media (max-width: 600px) {
   .app:has(.rating) {
@@ -786,13 +773,9 @@ select:focus-visible {
     width: min(100%, clamp(160px, calc(100svh - 390px), 320px));
   }
   .rating .swipe-card .placeholder {
-    font-size: 22px;
+    font-size: 32px;
     gap: 8px;
     white-space: nowrap;
-  }
-  .card-caption {
-    font-size: 10px;
-    line-height: 12px;
   }
   .rating-track-copy {
     height: 64px;
@@ -830,9 +813,6 @@ select:focus-visible {
   .vote-actions button {
     padding: 8px 4px;
     font-size: 12px;
-  }
-  .vote-actions .super {
-    grid-column: auto;
   }
   .swipe-hint {
     min-height: 0;

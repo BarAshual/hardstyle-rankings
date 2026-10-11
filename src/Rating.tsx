@@ -40,6 +40,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
   const departure = useRef<Choice | null>(null);
   const submitting = useRef(false);
   const mounted = useRef(false);
+  const feedback = useRef<HTMLDivElement>(null);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -272,7 +273,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
             track={track}
             enabled={enabled}
             allowUp={allowUp}
-            saving={busy}
+            feedbackRef={feedback}
             exit={exit}
             entering={entering}
             onEntered={() => setEntering(false)}
@@ -305,25 +306,36 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           ← PASS
         </button>
         <button
-          className="like"
-          disabled={!enabled}
-          onClick={() => void submit("LIKE")}
-        >
-          LIKE →
-        </button>
-        <button
           className="super"
           disabled={!enabled || home?.progress.super_likes_available === 0}
           onClick={() => void submit("SUPER_LIKE")}
         >
           ↑ SUPER LIKE
         </button>
+        <button
+          className="like"
+          disabled={!enabled}
+          onClick={() => void submit("LIKE")}
+        >
+          LIKE →
+        </button>
       </div>
-      <p id="swipe-hint" className="swipe-hint">
-        {allowUp
-          ? "Swipe ← Pass · Like → · ↑ Super Like"
-          : "Swipe ← or → · Super Like with the button"}
-      </p>
+      <div id="swipe-hint" className="swipe-hint">
+        <span className="swipe-instruction">
+          {busy
+            ? "Saving your choice…"
+            : exit
+              ? "Confirmed"
+              : allowUp
+                ? "Swipe ← Pass · ↑ Super Like · Like →"
+                : "Swipe ← or → · Super Like with the button"}
+        </span>
+        <div ref={feedback} className="swipe-feedback" aria-hidden="true">
+          <span className="intent-pass">← PASS</span>
+          <span className="intent-super">↑ SUPER LIKE</span>
+          <span className="intent-like">LIKE →</span>
+        </div>
+      </div>
       <div className="rating-message-slot">
         <p
           role="status"

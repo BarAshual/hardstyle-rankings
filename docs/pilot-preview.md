@@ -1,110 +1,185 @@
-# Pilot Preview readiness — 2026-10-11
+# Decision Record
 
-This is a testable Preview release, not approval to start official voting. No production deployment, production environment change, production database write, or official-season transition was performed during this readiness pass.
+## How to Use This Record
 
-## Release and environment
+Accepted decisions below come from the product brief. Implementation details marked open are not approved choices. If a task conflicts with an accepted decision, call out the conflict and propose an explicit change before implementing it. Record approved changes here with rationale and update related documents; do not silently replace established architecture.
 
-- Initial UI commit: `a74f99692ed8063cde005e3116fd10397c100abb` on `preview/mobile-pilot-readiness`.
-- Stable Preview: <https://hardstyle-rankings-git-preview-mobile-pilot-readiness-tiloz.vercel.app/>. Vercel Authentication remains enabled. The owner received a separate seven-day share link; its bypass token is deliberately excluded from Git.
-- First verified hosted deployment: `dpl_4qJZWBTS6offoUM7maauaFByatco`, READY, Preview target. Subsequent documentation-only pushes can update the branch alias without changing the UI implementation.
-- Supabase test project: **`tiloz-ranking-2k26-preview`**, reference **`mrcbzuuglyjjshrdlqdl`**, API **`https://mrcbzuuglyjjshrdlqdl.supabase.co`**, eu-central-1, PostgreSQL 17.11. All ten repository migrations were applied on the initially empty test project.
-- Only this branch's Vercel Preview variables point at that project. The hosted browser bundle was inspected for the test project URL and public publishable key, absence of the production reference, and absence of actual privileged keys. Operator credentials remain outside browser code and Git.
-- Git `main` is Vercel's automatically deployed production branch. It remains at `5e7af8fca41bb1513bc78116a65a60cef3ba452e`. The existing production deployment `dpl_5jE3iVE4eu9uWfbzEVBfYwhJDLGF` remains unchanged. No merge or push to main was made.
-- The first verified Preview build used Node 22.x; CI pins 22.23.3. Subsequent Git previews use the existing project settings. Global Vercel project settings were not changed.
+## Accepted Product and Architecture Decisions
 
-## Data and usable test season
+| ID | Type | Decision | Rationale |
+| --- | --- | --- | --- |
+| D01 | Product | Private annual seasons for approximately 15 friends; Google authentication and a nickname per season. | Match the group's yearly ranking workflow. |
+| D02 | Product | Mobile-first responsive web POC; no native app requirement. | Keep delivery manageable by one developer. |
+| D03 | Architecture | Supabase/Postgres and Supabase Auth; GitHub is the source of truth and migrations are versioned. | Keep infrastructure simple and integrity changes reviewable. |
+| D04 | Product | Lifecycle is `SETUP -> VOTING -> LOCKED -> REVEAL`; reveal is deliberate at the party. | Closing voting must not expose results. |
+| D05 | Product | No group preference data or inferred popularity before `REVEAL`, including for application admins. Only permitted personal and operational progress is visible. | Preserve the end-of-year surprise. |
+| D06 | Architecture | One current vote per `(season_id, user_id, track_id)`, stored as `PASS`, `LIKE`, or `SUPER_LIKE`. | Preserve raw intent and prevent duplicate current votes. |
+| D07 | Architecture | Transactional, idempotent voting using client action UUIDs, with audit history of changes. | Prevent lost votes and duplicate effects under retries. |
+| D08 | Architecture | Database constraints/RLS are the security boundary where practical; clients cannot bypass voting rules. | Frontend assumptions cannot protect data integrity. |
+| D09 | Architecture | Derive next tracks from missing votes and eventually use deterministic pseudo-random order per user. | Resume reliably while varying listening order. |
+| D10 | Architecture | Derive Super Like usage from current votes; no mutable usage counter. | Avoid counter drift. |
+| D11 | Product | Import the yearly Spotify playlist; eventually enrich tracks with Apple Music links and metadata. | Provide the season catalog and listening references. |
+| D12 | Product | Separate scoring from raw voting and defer the final ranking algorithm. | Keep future reveal calculations flexible. |
+| D13 | Architecture | Integrity precedes UI polish; avoid unnecessary services. | Keep the system reliable and maintainable. |
+| D14 | Product | Invite users by email for a specific season; authenticate with the invited Google identity. A forwarded link alone grants nothing. | Keep membership private. |
+| D15 | Architecture | Distinguish pre-authentication invitations from validated memberships; validate identity server/database-side. | Do not trust frontend identity claims. |
+| D16 | Product | Catalog additions are allowed during `VOTING`, preserve votes, and can reduce completion percentages. | Include late-year releases. |
+| D17 | Architecture | Derive completion from the current active catalog and votes; never persist permanent finished status. | Keep progress correct as the catalog grows. |
+| D18 | Product | Admins may increase the season-wide per-member allowance during `VOTING`; decreases are not approved initially. | Grant additional Super Likes without losing usage history. |
+| D19 | Architecture | Authorize and record allowance changes, including actor, time, reason, and old/new values; derive usage from votes. | Keep configuration changes understandable and usage consistent. |
+| D20 | Architecture | Owner direct database access is an accepted trust boundary; initial encrypted voting or cryptographic sealing is unnecessary. | Keep operations simple while restricting application admins. |
+| D21 | Product | Eventually let admins control visible result/insight categories after `REVEAL`; individual raw votes are not automatically public. | Preserve deliberate presentation and privacy. |
+| D22 | Architecture | First database foundation collects and protects source data only; defer result calculations and reveal implementation. | Establish trustworthy data before results. |
 
-**`PREVIEW TEST — Mobile pilot`**, season **`b4603c94-629e-446d-b0c1-0a389d035911`**, is deliberately left **VOTING**, with 20 tracks and allowance **2 Super Likes** per member. Open the Preview, sign in with the owner account used during verification, and choose this season. The owner started with one smoke-test vote; subsequent phone-test choices are expected to change their remaining count.
+## Accepted Foundation Decisions (2026-10-01)
 
-This is test data with real recording examples: titles, ordered artists, artwork and verified Spotify/Apple listening-link display metadata were read from the existing public dummy catalog, then assigned **new canonical UUIDs in the isolated test project**. No production Auth users, identities, memberships, votes, audit events, private import records or provider mappings were copied. These copies are listening fixtures, not an import/matching audit or an official catalog. The real Google owner signed in normally to this new project; the existing create-season RPC provisioned the owner membership under the documented operator trust boundary.
+| ID | Type | Decision | Rationale |
+| --- | --- | --- | --- |
+| D23 | Product | Season creator/provisioner is the first admin; roles are member and admin, scoped per season. | Simple authority without an organization system. |
+| D24 | Architecture | Compare trusted verified Google email using trim/lowercase only; bind invitation acceptance to auth.users.id. | Reject forwarded invitations and arbitrary frontend identity claims. |
+| D25 | Product | Replace votes during VOTING; no deletion back to unrated. | Support corrections while retaining history. |
+| D26 | Architecture | Integer expected-version contract: 0 creates version 1; edits match and increment current version. | Reject stale concurrent edits. |
+| D27 | Architecture | Exact accepted-action retries return stored outcomes; differing payloads with the same UUID fail explicitly. | Durable lost-response recovery. |
 
-Automated hosted checks used four ordinary authenticated synthetic test sessions plus an unverified fixture. Their verified Google identities were test fixtures, not completed Google logins. A separate eight-track test season, **`f8bd74b4-fb45-42eb-b772-499f7cc99171`**, was deliberately advanced to **LOCKED** for closure checks. It is separate from the human phone season. An earlier harness attempt's test season was retained rather than reset or deleted.
+## Foundation Implementation Choices
 
-Google's authorized redirect now includes `https://mrcbzuuglyjjshrdlqdl.supabase.co/auth/v1/callback`; existing redirects were preserved. Supabase's Site URL is the exact branch Preview origin and the frontend callback allowlist contains its exact `/auth/callback`. Google login requests basic identity only. Data API exposure is limited to `public`; unused GraphQL exposure and extra authentication methods are disabled on this test project.
+These are engineering choices for the accepted scope, not additional product features. Secured Postgres RPCs, an actor advisory lock followed by a season row lock, and append-only vote/configuration/lifecycle events implement the contracts. Successful UUIDs are scoped per actor across seasons and retained with audit history. Failed actions reserve no UUID. Same-choice actions increment version and append an event. No timestamp-based voting window was specified; the season state defines the window.
 
-## Brief review
+Authenticated, verified Google users may create a season and become its first admin; this grants no access to other seasons. There is no role-promotion API. Invitations have no expiry/deletion API in this foundation. Every catalog row is initially active; destructive operations are unavailable.
 
-The branded links, deliberate release-only swipe voting, shared durable submission pipeline and stable in-card transitions match the implementation brief. The owner's later design approval replaces the initial full Apple Listen-on badge with its official white icon and service name on red; Spotify uses its official black icon on green. Both buttons are equal 52 CSS px height and align with the voting columns. This design revision and official asset provenance are recorded in [frontend.md](frontend.md) and [src/assets/README.md](../src/assets/README.md).
+There are no remaining product decisions blocking this database foundation. Production identity-provider configuration and recovery validation remain deployment prerequisites.
 
-Only unrated Rating cards in VOTING accept left PASS, right LIKE and up SUPER_LIKE. Cancellation ends before submission. There is no post-send Undo, gesture editing in My Picks, new RPC/migration, group result surface, speculative queue, music OAuth, playback or choice analytics. Authentication contracts, RLS, action UUIDs, integer vote versions, immutable receipts/events and queue ordering are unchanged. Exact gesture calibration and reduced-motion behavior are in [frontend.md](frontend.md#mobile-rating-interaction-2026-10-11).
+## Other Open Questions — Not Foundation Blockers
 
-## Verification results
+- Full invitation expiry, revocation, resend, and Google-account-change features remain deferred. The accepted minimal identity contract is D24; broader features need not block the foundation.
+- Initial Super Like number: the API requires explicit nonnegative season configuration rather than a hard-coded product default. The product value can be chosen when creating a season.
+- Destructive catalog edits, merging/deduplication of voted tracks, retention, and account deletion: the foundation exposes no destructive operations and preserves history; final policy is deferred.
+- Broader nickname rules, hosting, import/enrichment integrations, and production backup/restore operations. Production recovery is not a blocker to local foundation work, but must be defined and verified before real voting data is collected.
+- Scoring, tie-breaking, artist aggregation, result categories/toggles/defaults, party sequence, post-reveal individual vote visibility, and exceptional lifecycle corrections.
 
-| Layer | Result and practical scope |
+## Database Foundation Scope
+
+Implementation is now authorized. See [database-foundation.md](database-foundation.md) for commands, contracts, and verification status.
+
+1. Establish local Supabase development and documented repeatable commands; add version-controlled initial migrations for core entities, relationships, constraints, and indexes.
+2. Implement invitation/membership foundations using the accepted trusted identity matching and admin authority contracts. Do not deliver invitation emails or choose a provider.
+3. Enforce secrecy with RLS and grants, including audit data, safe personal/operational progress reads, and prevention of direct-write bypasses. Keep others' raw votes restricted even in `REVEAL` until visibility is specified.
+4. Implement transactional voting, action UUID idempotency, atomic audit history, concurrency-safe derived Super Like enforcement, and integer expected-version stale-write protection.
+5. Implement authorized forward lifecycle transitions coordinated with vote writes, safe additions during `VOTING`, and authorized audited allowance increases.
+6. Add synthetic fixtures and meaningful database integration tests, including concurrent sessions. Document the chosen contracts, test commands, and repeatable local database reset. Record production recovery follow-up requirements without selecting advanced infrastructure.
+
+### Concrete Acceptance Criteria
+
+- A fresh local database can be rebuilt from tracked migrations and synthetic fixtures, with documented setup/test commands and no secrets committed.
+- Constraints prevent invalid raw vote values, duplicate current votes, invalid membership/track references, and unauthorized writes. Clients cannot bypass voting operations through table writes or alter audit history.
+- Matching trusted Google identity can accept an invitation; uninvited, mismatched, forwarded-link-only, and client-forged identity attempts fail at the database boundary where testable. Admin authority cannot be self-assigned.
+- Member and application-admin tests demonstrate no access to other users' preferences or aggregates in `SETUP`, `VOTING`, or `LOCKED`. Own votes and permitted operational progress remain available. `REVEAL` does not automatically publish raw votes.
+- Tests cover first vote, an allowed existing-vote change, same-choice requests, failed-action retries, and concurrent actions under the reviewed contract. A lost-response simulation retries the original action and recovers its recorded outcome.
+- Identical accepted-action retries produce one logical effect and one audit event; conflicting UUID payloads fail. Rollback leaves neither partial votes nor orphan audit events. Stale and concurrent-device edits cannot overwrite newer accepted state.
+- Concurrent Super Like attempts near the allowance never exceed it. An authorized increase preserves existing usage and records actor/time/reason/old/new values; unauthorized changes and in-scope decreases fail.
+- Voting-versus-locking race tests demonstrate coherent transaction ordering: no new vote is accepted after closure, and accepted-action replay adds no write. Unauthorized/invalid lifecycle transitions fail.
+- Adding tracks during `VOTING` preserves existing votes and audit history, makes additions unvoted for all members, and recalculates completion, including a previously complete member becoming incomplete. Unauthorized catalog additions fail. No destructive catalog operation is introduced without an explicit policy.
+- Relevant integration checks pass and their results/limitations are reported. No result calculation or reveal functionality is introduced.
+
+### Explicitly Deferred
+
+UI, actual invitation email delivery/provider selection, Spotify import integration, Apple Music integration, scoring formulas, leaderboards, result aggregation APIs, artist rankings, user similarity, party presentation logic, reveal-category implementation, and persisted result snapshots.
+
+## Implementation Status
+
+Database foundation migrations, configuration, synthetic fixtures, and integration tests are implemented. No UI, results, external music/email integration, or Git commit is included. Verification results and environment limitations are recorded in database-foundation.md.
+
+## Frontend Implementation Note (2026-10-03)
+
+The first browser slice uses Vite/React/TypeScript and the normal Supabase Google OAuth PKCE flow. A read-only `inspect_invitation` RPC bridges private invitation validation and nickname collection without creating membership or exposing the invitation table. `accept_invitation` remains the sole invited-membership write boundary. At that milestone nickname uniqueness was not required; the 2026-10-06 decision below supersedes this. See [frontend.md](frontend.md) for the compatibility details and manual OAuth setup. No results, voting UI, or admin dashboard is introduced.
+
+## First voting implementation (2026-10-03)
+
+The personal queue uses MD5 of colon-separated user/season/track UUIDs and a track UUID tie-breaker. This stable pseudo-random ordering requires no mutable index and naturally includes later catalog additions. Null queue results, including an empty catalog, mean “You’re caught up” with current rated/total and remaining allowance. A localStorage journal stores each pending action before transmission; unknown outcomes replay the same actor-bound UUID and payload. The existing cast_vote, expected-version, locks, RLS, audit, and derived allowance contracts are unchanged. A separate read-only queue RPC and explicitly invoked local fixture script support this slice; no results or scoring is added.
+
+## My Picks and nickname identity (2026-10-06)
+
+**D28 — accepted product change:** Within a season, nicknames must be unique case-insensitively. Preserve chosen display casing and permit reuse in another season. The uniqueness key is `lower(btrim(nickname))`, consistent with existing ordinary-space nickname trimming; no accent folding or extra Unicode normalization is introduced. Existing collisions stop the migration for explicit owner correction; do not rename users automatically.
+
+My Picks uses existing RLS table reads and the existing cast_vote RPC. Search/filter stays in the browser; pagination uses track UUIDs. A same-choice selection is a UI no-op. A stale edit reloads the current vote and waits for a new user decision. The shared pending journal accepts nonnegative integer expected versions and remains compatible with existing version-0 records. Raw votes remain private in LOCKED and REVEAL.
+
+GitHub Actions runs a minimal frontend job and a separate local Supabase integration job on disposable Ubuntu runners, with pinned actions/tool versions and no project/OAuth secrets. No new external service or deployment pipeline is introduced.
+
+## Accepted catalog ingestion decisions (2026-10-07)
+
+These decisions supersede the initial catalog design proposals. See [catalog-ingestion.md](catalog-ingestion.md) for details; no importer or migration is implemented by this record.
+
+| ID | Type | Accepted decision | Rationale |
+| --- | --- | --- | --- |
+| D29 | Product | A season may designate one primary Spotify playlist initially; support other sources later without Spotify-coupled canonical storage. | Start simply and preserve provider independence. |
+| D30 | Architecture | Permanent internal UUIDs identify canonical tracks and artists; external provider IDs are mappings only. | Metadata/provider changes must not change vote targets. |
+| D31 | Product | Different released versions MUST be separate canonical tracks, including remixes, edits, extended/radio mixes, distinct released bootlegs, VIPs, acoustic/live/reworks and other variants. Metadata similarity or shared ISRC cannot collapse them. | Wrong merges are more damaging than duplicate records. |
+| D32 | Product | Release-year mismatch is a visible review warning, not automatic exclusion/rejection; admin may explicitly include the item. | Provider dates can describe compilations, re-releases or other contexts. |
+| D33 | Product | Default Spotify ingestion market is `IL`, configurable at the season/ingestion boundary. | Predictable availability without coupling identity to market. |
+| D34 | Integrity | If either suspected duplicate has vote history, retain both tracks: no automatic merge/delete, vote movement, history/event rewrite, or silent deactivation. Flag for explicit review. | Historical voting integrity takes priority over catalog cleanup. |
+| D35 | Architecture | Exact known provider identities reuse accepted mappings and canonical records. New match candidates require review or separate identity; ISRC/title/artists/duration are not automatic equivalence. | Safe idempotency without destructive inference. |
+| D36 | Integrity | Reimports create no duplicate records for the same provider identity or season membership. Additions during VOTING preserve every vote/event and naturally reopen derived unrated work. | Reliable growth and retries. |
+
+### Implementation recommendations, not accepted product rules
+
+Use private provider mappings, source configuration, minimal import/run-item persistence, explicit grants, and a bounded local/admin CLI with dry-run/apply. Recommend operator OAuth with PKCE for accessible owned/collaborative playlists, reviewed year-inclusion evidence, conservative metadata refresh, and provider artwork URLs with fallback. Exact table shapes and operational defaults are proposals for implementation review. No integration, migration, CLI, OAuth, UI, scoring, or results is implemented in this design task.
+
+No product-policy questions block the first importer. The actual designated playlist and permitted operator access are run-time configuration prerequisites. Future destructive reconciliation remains deferred and does not block preservation/reporting. No new tag or main merge accompanies this design commit.
+
+## Accepted catalog admission refinement (2026-10-07)
+
+These refine the preceding design; implementation remains deferred.
+
+| ID | Accepted product decision |
 | --- | --- |
-| Frontend | **114 tests passed** after the outbound-motion, downward-drag and compact-layout/scroll-safety corrections, typecheck, ESLint and build passed. Gesture cancellation/release, duplicate events, quota races, pending storage, receipt validation, uncertain responses, account changes, read-only retry and accessibility alternatives are covered. Main production bundle is 489.63 kB before compression. Additional regression checks cover holding final release offsets through slow saving/capture loss and continuing all three confirmed exits without a return to center. An initial earlier run stalled and timed out; a clean rerun passed without changing test limits. |
-| Local database | **80 tests passed** in the guarded disposable stack `hardstyle-rankings-voting-check` (API 55421 / DB 55422). All ten migrations and database lint passed. Real SQL grants/RLS and HTTP tests include secrecy through SETUP/VOTING/LOCKED, role boundaries, invitations, concurrent voting/last-slot quota, rollback and immutable audits. The regular real-account local database was not reset. |
-| GitHub CI | [Run 38124204885](https://github.com/BarAshual/hardstyle-rankings/actions/runs/38124204885) passed for the UI commit: frontend gate, clean database rebuild/lint, **80 database tests** and **10 mocked importer tests**. Existing unrelated Cloud-importer working-tree edits are excluded from this release, so its larger local test count is not attributed to this commit. |
-| Simulated mobile browser | Widths 320/375/390/414 CSS px were checked. Real local Data API checks covered neutral/multitouch/cancel gestures, outside-card scroll, slow acceptance, failed next read, reload plus exact lost-response replay, all choices, zero quota, keyboard and reduced motion. No horizontal overflow or runtime errors was observed. These are simulations, not physical-device tests. |
-| Hosted Data API | **Nine named groups of checks passed** with normal authenticated role tokens on the isolated Cloud project. Details below. Privileged credentials were used only for fixture/session setup, never the security assertions. |
-| Real hosted Google/browser | Normal Google account selection returned through Supabase to the branch Preview, restored a session and showed the invitation-only gate. After test provisioning, Rating saved a vote, advanced to the next track and restored persisted progress after refresh. |
+| D37 | Automatically admit clean, unambiguous designated-playlist candidates after validation/identity checks; no per-track approval. Hold year mismatches, suspected matches, material identity inconsistencies, and insufficient identifying metadata for explicit review. |
+| D38 | Admit new season tracks only in SETUP/VOTING, never LOCKED/REVEAL. |
+| D39 | Playlist removal is non-destructive: no automatic removal, deactivation, deletion, or vote change. |
+| D40 | Future explicit audited admin withdrawal is allowed only in SETUP/VOTING. Preserve canonical tracks, season associations, votes and events; stop new voting, exclude eventual scoring/results, and retain personal history marked withdrawn/ineligible. Exceptional post-lock correction remains future policy. |
+| D41 | Suspected duplicates block automatic admission and merging. Review may admit a distinct recording, safely resolve a provider mapping, or defer/decline; it must not expose pre-REVEAL group preferences or weaken existing raw-vote privacy. |
+| D42 | IL playback availability is not season eligibility. Flag restrictions; identifiable recordings follow ordinary automatic/review admission rules. |
+| D43 | An admin may replace the designated playlist through an audited change in SETUP/VOTING; record the change, affect future imports only, and preserve already-admitted tracks. |
+| D44 | Clearly non-identity-changing provider URL/artwork/availability/album/release observations may refresh automatically; material title, artist-credit identity, or version/remix changes require review. Never silently change a voted recording. |
 
-### Hosted durability and backend secrecy
+Audited withdrawal is distinct from the automatic deactivation prohibited by D34. It is accepted future behavior, not a new importer feature in this documentation task. No genuine product decision blocks the first importer; storage and workflow details remain engineering recommendations.
 
-1. Discarding an accepted response before reading its receipt, then replaying the **same UUID and payload**, returned the identical version-1 receipt. Fresh reads showed one vote and one event.
-2. Reusing that UUID with a changed payload was rejected. A new action against stale version 0 was rejected.
-3. Allowance 1 was enforced from persisted votes; a second Super Like was rejected and remaining allowance read as zero.
-4. Two concurrent distinct actions for the same unrated track accepted exactly one.
-5. Two concurrent Super Likes competing for the final slot accepted exactly one.
-6. During **VOTING**, filtered and broad reads of `votes`/`vote_events` exposed only the caller's own rows. Cross-user reads returned zero rows for ordinary members, an outsider and the **application admin**. Data API preference aggregates were rejected. Admin progress returned only operational completion fields, and members could not invoke it.
-7. The same secrecy checks passed after **LOCKED**. This includes backend requests, not just hidden UI controls.
-8. LOCKED rejected new votes and edits while still replaying an already accepted action's original receipt.
-9. Direct PATCH/DELETE vote writes, anonymous reads and outsider voting were denied.
+## First importer implementation (2026-10-07)
 
-The restored database also passed direct authenticated SQL cross-user and GROUP BY preference denial, including the application admin. This does not claim isolation from the trusted Supabase/database owner or a service-role operator; those are separate privileged trust boundaries.
+The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.
 
-## Backup inventory and isolated restore
+## Accepted initial production rollout (2026-10-11)
 
-Read-only inspection of the existing production project's backup metadata returned `backups: null`, `physical_backup_data: {}`, `pitr_enabled: false`, and `walg_enabled: true`. There was **no exposed downloadable managed backup or enabled PITR to use for recovery**. The WAL flag alone is not evidence of an operator-accessible restorable backup. No repository backup scheduler, retention policy or independent encrypted archive exists. Current free-tier limitations are described in the [Supabase production guide](https://supabase.com/docs/guides/deployment/going-into-prod) and [backup documentation](https://supabase.com/docs/guides/platform/backups).
+The owner selected Vercel Hobby and Supabase Cloud Free, with no paid upgrades or domain purchase for now. The requested frontend name is tiloz-ranking-2k26; its vercel.app domain remains subject to assignment. Production starts clean: local votes are experiments and are not transferred. Repeated hosted tests and a 2–3 user pilot use separate dummy seasons. The first dummy season allowance is 50; the official allowance remains open.
 
-A rehearsal exported **only the new synthetic Preview project** read-only, then restored to a **new blank local database** `pilot_restore_v3`, inside the isolated `hardstyle-rankings-restore-check` Supabase stack at DB 55522. No existing Cloud or normal local database was overwritten, reset, cleaned or restored over. Earlier partial attempts were retained on other new local databases; the final complete pass used a fresh snapshot and target.
-
-The custom PostgreSQL 17 archive explicitly included **`public`, `private`, `auth`, `supabase_migrations`**, with `--no-owner`. Its cutoff precedes the real Google owner and human phone season created above. It contains five synthetic Auth users, two test seasons, 16 tracks, eight current votes and eight immutable events, and all ten migration versions. The 273,702-byte archive's SHA-256 is `0cec2ce77a7290a0cfeb2d6573518c9de62a38833d02a148c7c434f5dca85161`.
-
-**Passed:** exact row counts and ordered-content hashes for all **47 tables**; stable Auth user/identity UUIDs; choices, integer versions and receipt/audit history; RLS policies; effective application role privileges and role attributes; function bodies and security-definer settings; constraints and triggers; identical accepted-action replay after LOCKED; denial of cross-user rows and preference aggregates after restore, including admin. One lifecycle CHECK expression had equivalent associative OR parentheses flattened by PostgreSQL; its predicates and all other constraints matched. Cluster roles were supplied by the fresh Supabase image, and object ownership intentionally changed to the trusted local restore role; this is not an identical managed-cluster owner/role export.
-
-The export took about 12.9 seconds; archive SQL restore about 0.15 seconds. These measurements exclude provisioning, validation, credentials, OAuth and frontend reconnection, and **are not an RTO guarantee**. Protected operator artifacts remain in ignored `.tools/pilot-preview/` with directory/file permissions 700/600. The rehearsal archive is local and unencrypted; it is not an independent production backup.
-
-### Recovery limitations that remain open
-
-- The eight `private` importer/provider/source tables were present but empty in this snapshot. Restoring **populated** mappings, source evidence and import/review audits has not been exercised.
-- A full isolated **Cloud** restore and subsequent real Google sign-in, identity continuity and frontend reconnection have not been performed. The local Auth service was disabled for this SQL restore test. There is no unused isolated Cloud project within the current two-project Free setup; paid infrastructure was not provisioned.
-- Managed project configuration, OAuth client configuration/secrets, JWT/signing configuration, Storage objects and other managed services are outside the archive's four-schema scope. Configuration/secret recovery needs its own protected inventory; live OAuth/importer token files should not be archived as backups.
-- Backup frequency, encrypted independent storage, retention, monitoring, RPO/RTO, and the official-vote retention/recovery procedure remain decisions and implementation work. Do not start official voting until an approved recoverable backup process and complete isolated recovery rehearsal exist.
-
-## Owner phone checklist
-
-Use only `PREVIEW TEST — Mobile pilot` in the linked test project. Leave the official season untouched. Safari/iOS and Chrome/Android should both be tried on real phones:
-
-1. With the page fitting the screen, deliberately swipe left, right and up; verify the intended choice saves once, progress survives refresh and My Picks matches. All three buttons remain usable.
-2. Cross each threshold, return to the center **before release**, then release. No vote should save. Also try jitter, down/diagonal motion, a second finger and switching apps mid-drag.
-3. Verify the provider links and all three vote buttons are visible without page scrolling in the normal phone viewport. Try a short landscape viewport, browser bars and zoom: whenever page scrolling is needed, scroll over the artwork and verify it never sends Super Like; use its button instead. Check long-text scrolling, screen-edge system gestures and no horizontal overflow.
-4. Open Apple Music and Spotify and return. Verify native app/browser handoff, correct recordings and no unintended vote.
-5. Use slow/offline networking: the current track must stay pending; refresh then retry the original action. One logical action must produce one vote/version/event. If only the next-track read fails, retry must read only. Check quota 0, OS Reduce Motion and screen-reader/button access.
-
-The owner reported all three swipe directions and both provider links working on a real phone with the initial Preview. Device/browser details, crossing then returning, slow-network recovery and the subsequent outgoing-motion correction remain to be confirmed physically. Invitation acceptance plus wrong-account rejection across **two real Google accounts** also remains unverified. Two test invitations have since been issued as recorded below; synthetic backend admission tests do not replace the invitees’ real Google handshake. Invited test accounts must also be allowed by the Google OAuth testing audience.
-
-**Ready:** reviewable Git branch, isolated hosted Preview, real owner Google sign-in, durable voting/security checks and bounded SQL recovery rehearsal. **Owner checks:** revised outgoing motion and the remaining phone scenarios, plus the second Google account. **Official-release blockers:** the incomplete production backup/recovery process and its populated-data/Cloud-Auth rehearsal; any failures found during those phone/account checks. Preview readiness does not remove these gates in [deployment.md](deployment.md).
-
-## Outgoing-motion correction after owner phone feedback
-
-The branch now includes a correction for the release-to-center jump: submitted cards hold their final displacement, then confirmed exits travel beyond the viewport from that position. The frame no longer clips the card at artwork boundaries; horizontal overflow is clipped at the full-width application root. Cancellation and failed/unconfirmed submissions return to center. This is a visual/submission-result handoff change, not a change to the RPC, pending action identity, acceptance, RLS or secrecy contracts. The owner should reload the same Preview and retest this revised motion.
-
-Motion regression validation passed: all **96 frontend tests**, typecheck, ESLint and build; a 390 CSS px browser QA harness used the actual SwipeCard/styles with a deliberately delayed synthetic receipt. Sampled frames for PASS, LIKE and SUPER_LIKE held exactly 135 px during saving, started the confirmed animation at that same displacement, progressed monotonically beyond the viewport and never returned to center. Maximum document width stayed 390 px. No backend writes occurred in this animation harness. [CI run 38127606594](https://github.com/BarAshual/hardstyle-rankings/actions/runs/38127606594) also passed for the preceding documentation checkpoint.
-
-## Downward-drag and invitation follow-up
-
-The artwork stays centered for downward and downward-diagonal drags. Horizontal swipes tolerate slight downward finger drift while holding their vertical position at zero. Direction/threshold classification still uses the original displacement, so clamping cannot convert a neutral downward diagonal into PASS/LIKE. Returning an upward swipe to or past the center cancels it, and starting downward does not prevent reversing into a supported direction before release. All **104 frontend tests**, typecheck, ESLint and build passed for this correction.
-
-The owner's nickname screen is skipped because provisioning the human test season already created their admin membership with nickname `Bar test`. Nickname selection occurs on first invited membership in each season; reopening an accepted invitation or signing in again retains the chosen name. There is no rename UI in the current scope.
-
-A rollback-only rehearsal in the isolated Preview database exercised the existing RPCs under normal authenticated owner/test-member roles: new invitation inspection returned null nickname, a case-insensitive duplicate was rejected atomically, accepting an unused nickname returned the season and subsequent inspection returned that name, and acceptance replay did not rename it. The rehearsal left no invitation/member rows behind. This checks the backend contract within a transaction, not a second real Google login.
-
-At the owner's request, two email-bound invitations were subsequently committed through `invite_member` for the human Preview season. No memberships were provisioned for those invitees, allowing first-join nickname selection. Personal emails, invitation URLs and temporary Vercel share tokens are excluded from Git; the owner received messages to forward. Actual invitee Google sign-in, nickname selection and refresh remain pilot checks.
+A dummy season does not isolate shared schema/catalog changes or database restore. Destructive rehearsals require a separate disposable target once official data exists. Backup frequency, acceptable recovery loss/downtime, independent storage and scheduling remain open; tested recovery is required before official voting. See [deployment.md](deployment.md) for the runbook and unverified rollout status. Existing vote integrity, owner trust boundary and pre-REVEAL secrecy are unchanged.
 
 
-## Compact phone layout and scroll safety
+## Authorized Cloud dummy pilot (2026-10-11)
 
-The owner's latest phone screenshot showed unused header/status space pushing provider/vote controls below the first screen, and an upward attempt to scroll triggered Super Like. The accepted revision compacts the rating-only shell, sizes the artwork to available height and places the three vote buttons together. Upward voting now requires the whole document to fit the visible viewport. Otherwise the surface allows native vertical scrolling, keeps left/right choices and presents Super Like through its button. Empty status/recovery placeholders no longer create whitespace; visible errors and pending retries remain accessible through scrolling.
+The owner authorized a bounded production importer extension and supplied a Spotify source for the first dummy season. Remote operations require an exact HTTPS project origin, explicit project/season flags matching protected session metadata, a fresh Cloud Google operator session, and locally project/season-bound plan files. Existing Google-admin RPCs, Spotify PKCE grant, evidence-bound review, catalog/vote locks and secrecy remain unchanged. No service-role importer or direct table-write path is added. Full scans retain collision evidence; a stable first-20-occurrence apply limit bounds admission and retries. The owner explicitly approved the selected 2021–2025 release-year exceptions for this dummy season only. This does not approve other playlists, broader year exceptions, official-season voting or an unbounded production import. Recovery/restore readiness remains required before official voting.
 
-All **114 frontend tests**, typecheck, ESLint and build passed. Browser measurements at 320×568, 375×600, 390×640 and 414×700 found every vote button visible and no horizontal/page overflow. At 390×440, scrolling over the card moved the page without changing progress, upward drag did not vote, and deliberate horizontal voting and the Super Like button still worked. Long-text scrolling and a simulated lost-response retry were also checked with the actual React components and fictional in-memory data. The lost-response message triggered the scroll-safe mode and one vote remained after retry. These were browser mouse/wheel checks and unit touch-event simulations, not a claim that native phone gestures or OS text scaling were verified. Recheck the updated Preview physically, especially browser bars, zoom and scrolling over the card. No database, migrations, Cloud data or production deployment were changed in this revision.
+
+## Mobile rating implementation details (2026-10-11)
+
+The authorized pilot UX brief implements the existing left/PASS, right/LIKE, up/SUPER_LIKE mapping for unrated Rating cards only. Branded external links are shared with My Picks and use official locally stored assets. Submission/recovery/versioning/privacy rules are unchanged; cancellation is permitted only before submission and uncertain outcomes retain the original action. Card departure follows accepted receipt validation, and next-track failure retries existing reads only.
+
+In a subsequent authorized visual revision, the owner accepted compact single-row icon/service-name buttons in place of the original full Apple Listen on badge and Spotify full-logo presentation. The official provider icons remain unchanged local artwork; a shared Listen on caption and the existing accessible link names identify the action. Red/green button colors, equal dimensions and a group aligned to the content column are presentation details, with no catalog, playback or voting contract change.
+
+Activation (12 CSS px), directional dominance (1.35×), clamped quarter-surface thresholds, ±7° horizontal rotation, and 210/220/180 ms return/exit/entry timings are engineering calibration values documented in [frontend.md](frontend.md), not historical product decisions or physically validated thresholds. Browser simulations passed; physical Safari/iOS and Chrome/Android testing remains a pilot gate. This entry preserves earlier decisions and adds no results, Undo, music playback/OAuth, queue, or backend contract.
+
+
+## Accepted compact rating and scroll fallback (2026-10-11)
+
+Following the owner's phone screenshot and approval to continue, mobile Rating prioritizes a single visible screen containing the artwork, track details, listening links and all three vote buttons. Left/PASS, right/LIKE and up/SUPER_LIKE remain the mapping when the page fits. If the visible viewport cannot contain the page, native vertical scrolling takes priority and Super Like uses its explicit button. Vertical gestures yielded to scrolling never become votes through later sideways drift; viewport mode changes cancel an active gesture before submission. This is an accepted interaction adjustment to prevent accidental votes, with no change to stored choices, allowances, durable action identity, privacy or the official season. Calibration and physical-device limitations are documented in [frontend.md](frontend.md).
+
+
+## Accepted borderless artwork and vote order (2026-10-11)
+
+The owner approved removing the visible artwork frame and permanent drag caption, and ordering vote controls as PASS left, SUPER LIKE center and LIKE right. Artwork fills its existing square drag surface without outer padding. Gesture and saving/receipt feedback use the existing instruction row below the controls, outside the album image, without reserving a separate frame band. This supersedes the original visual frame treatment while preserving gesture mapping, scrolling safety and all voting/privacy contracts. See [frontend.md](frontend.md) for implementation and verification.
+
+
+## Borderless artwork and vote control order
+
+The subsequent owner-approved revision removes the decorative artwork frame, its padding and the persistent drag caption. The cover fills the square gesture surface; dynamic choice feedback and saving/confirmed labels use the existing hint row below the controls and never cover the album artwork. At every breakpoint the controls run left to right as PASS, SUPER LIKE, LIKE, including keyboard focus order. This is a presentation revision to the brief, with no voting, database or privacy contract changes.
+
+All **114 frontend tests**, typecheck, ESLint and build passed. Actual-component browser checks covered 320/375/390/414 px mobile widths, a short 440 px viewport and desktop: zero outer frame/padding, artwork matching the surface bounds, stable controls and the new order. At 390×640, the cover grew from 176 to 250 CSS px without moving the vote controls. Outside-image feedback, below-threshold cancellation, a delayed synthetic receipt, center/right button choices, keyboard order and short-viewport scrolling safety were checked with fictional data. This revision still needs a physical phone check after refreshing the same Preview. No Cloud votes were submitted during these checks.

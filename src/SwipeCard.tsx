@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from "react";
 import type { Choice, Track } from "./api";
 import { Artwork } from "./Artwork";
@@ -18,7 +19,7 @@ export function SwipeCard({
   track,
   enabled,
   allowUp,
-  saving,
+  feedbackRef,
   exit,
   entering,
   onEntered,
@@ -27,7 +28,7 @@ export function SwipeCard({
   track: Track;
   enabled: boolean;
   allowUp: boolean;
-  saving: boolean;
+  feedbackRef?: RefObject<HTMLDivElement | null>;
   exit: Choice | null;
   entering: boolean;
   onEntered: () => void;
@@ -39,12 +40,17 @@ export function SwipeCard({
   const stopDrag = useCallback(() => {
     const active = drag.current;
     drag.current = null; // Clear before releasing capture; lostcapture must never commit.
+    const feedback = feedbackRef?.current;
+    if (feedback) {
+      feedback.dataset.intent = "";
+      feedback.style.setProperty("--intent-strength", "0");
+    }
     const el = surface.current;
     if (!el) return;
     el.dataset.dragging = "false";
     if (active && el.hasPointerCapture?.(active.id))
       el.releasePointerCapture(active.id);
-  }, []);
+  }, [feedbackRef]);
   const reset = useCallback(() => {
     stopDrag();
     const el = surface.current;
@@ -149,19 +155,20 @@ export function SwipeCard({
       "--drag-rotation",
       `${intent === "PASS" || intent === "LIKE" ? Math.max(-7, Math.min(7, (x / active.width) * 12)) : 0}deg`,
     );
-    el.style.setProperty(
-      "--intent-strength",
-      String(
-        intent
-          ? Math.min(
-              1,
-              intent === "SUPER_LIKE"
-                ? -y / threshold.up
-                : Math.abs(x) / threshold.horizontal,
-            )
-          : 0,
-      ),
-    );
+    const strength = intent
+      ? Math.min(
+          1,
+          intent === "SUPER_LIKE"
+            ? -y / threshold.up
+            : Math.abs(x) / threshold.horizontal,
+        )
+      : 0;
+    el.style.setProperty("--intent-strength", String(strength));
+    const feedback = feedbackRef?.current;
+    if (feedback) {
+      feedback.dataset.intent = activated ? (intent ?? "") : "";
+      feedback.style.setProperty("--intent-strength", String(strength));
+    }
   }
   function release(e: ReactPointerEvent<HTMLDivElement>) {
     const active = drag.current;
@@ -205,21 +212,7 @@ export function SwipeCard({
       onDragStart={(e) => e.preventDefault()}
       onAnimationEnd={onEntered}
     >
-      <div className="swipe-feedback" aria-hidden="true">
-        <span className="intent-pass">← PASS</span>
-        <span className="intent-like">LIKE →</span>
-        <span className="intent-super">↑ SUPER LIKE</span>
-      </div>
       <Artwork key={track.id} track={track} />
-      <p className="card-caption" aria-hidden="true">
-        {saving
-          ? "Saving your choice…"
-          : exit
-            ? "Confirmed"
-            : allowUp
-              ? "Drag the card · release to choose"
-              : "Swipe left or right · scroll normally"}
-      </p>
     </div>
   );
 }

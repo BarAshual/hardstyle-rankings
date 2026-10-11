@@ -165,3 +165,8 @@ Activation (12 CSS px), directional dominance (1.35×), clamped quarter-surface 
 ## Accepted compact rating and scroll fallback (2026-10-11)
 
 Following the owner's phone screenshot and approval to continue, mobile Rating prioritizes a single visible screen containing the artwork, track details, listening links and all three vote buttons. Left/PASS, right/LIKE and up/SUPER_LIKE remain the mapping when the page fits. If the visible viewport cannot contain the page, native vertical scrolling takes priority and Super Like uses its explicit button. Vertical gestures yielded to scrolling never become votes through later sideways drift; viewport mode changes cancel an active gesture before submission. This is an accepted interaction adjustment to prevent accidental votes, with no change to stored choices, allowances, durable action identity, privacy or the official season. Calibration and physical-device limitations are documented in [frontend.md](frontend.md).
+
+
+## Accepted borderless artwork and vote order (2026-10-11)
+
+The owner approved removing the visible artwork frame and permanent drag caption, and ordering vote controls as PASS left, SUPER LIKE center and LIKE right. Artwork fills its existing square drag surface without outer padding. Gesture and saving/receipt feedback use the existing instruction row below the controls, outside the album image, without reserving a separate frame band. This supersedes the original visual frame treatment while preserving gesture mapping, scrolling safety and all voting/privacy contracts. See [frontend.md](frontend.md) for implementation and verification.
