@@ -81,7 +81,12 @@ function mount(api: API, route = `/seasons/${sid}/rate`) {
 }
 const button = (choice: Choice) =>
   screen.getByRole("button", {
-    name: choice.replace("_", " "),
+    name:
+      choice === "PASS"
+        ? "← PASS"
+        : choice === "LIKE"
+          ? "LIKE →"
+          : "↑ SUPER LIKE",
   });
 
 describe("durable rating", () => {

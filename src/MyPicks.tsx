@@ -447,7 +447,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                           )}
                         </div>
                         <div className="pick-controls">
-                          <MusicLinks track={p} />
+                          <MusicLinks track={p} appearance="subtle" />
                           <div
                             className="vote-actions pick-actions"
                             aria-label={`Edit ${p.title}`}

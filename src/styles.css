@@ -6,9 +6,6 @@
   font-weight: 400;
   line-height: 1.55;
   color-scheme: dark;
-  --vote-pass: #f0808c;
-  --vote-like: #71c79a;
-  --vote-super: #d8ee69;
 }
 * {
   box-sizing: border-box;
@@ -502,32 +499,32 @@ footer {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
-.vote-actions [data-choice="PASS"],
+.rating .vote-actions .super {
+  border-color: #d8ee69;
+  color: #d8ee69;
+}
+.rating .vote-actions .like {
+  background: #d8ee69;
+  color: #14160c;
+}
+.picks {
+  --vote-pass: #f0808c;
+  --vote-like: #71c79a;
+  --vote-super: #d8ee69;
+}
+.pick-actions [data-choice="PASS"],
 .pick-choice [data-choice="PASS"] {
   --choice-color: var(--vote-pass);
 }
-.vote-actions [data-choice="LIKE"],
+.pick-actions [data-choice="LIKE"],
 .pick-choice [data-choice="LIKE"] {
   --choice-color: var(--vote-like);
 }
-.vote-actions [data-choice="SUPER_LIKE"],
+.pick-actions [data-choice="SUPER_LIKE"],
 .pick-choice [data-choice="SUPER_LIKE"] {
   --choice-color: var(--vote-super);
 }
-.vote-actions button {
-  gap: 5px;
-  border-radius: 10px;
-}
-.rating .vote-actions button {
-  color: var(--choice-color);
-  border-color: var(--choice-color);
-  background: #19191d;
-}
-.rating .vote-actions button[data-choice="SUPER_LIKE"] {
-  color: #14160c;
-  background: var(--choice-color);
-}
-.vote-actions button:hover:not(:disabled) {
+.pick-actions button:hover:not(:disabled) {
   box-shadow: inset 0 0 0 1px var(--choice-color);
 }
 
@@ -846,9 +843,7 @@ select:focus-visible {
   border-radius: 10px;
 }
 .music-link {
-  border: 1px solid #38383e;
-  background: #19191d;
-  color: #f3f0e8;
+  border: 1px solid transparent;
   padding: 0 12px;
   gap: 12px;
   font-size: 14px;
@@ -862,7 +857,20 @@ select:focus-visible {
   flex: 0 0 24px;
   object-fit: contain;
 }
-.music-link:hover {
+.music-links-branded .apple-link {
+  background: #e71935;
+  color: #fff;
+}
+.music-links-branded .spotify-link {
+  background: #1ed760;
+  color: #000;
+}
+.music-links-subtle .music-link {
+  border-color: #38383e;
+  background: #19191d;
+  color: #f3f0e8;
+}
+.music-links-subtle .music-link:hover {
   border-color: #777780;
   background: #242428;
 }
@@ -952,15 +960,15 @@ select:focus-visible {
   opacity: 0;
 }
 .swipe-feedback[data-intent="PASS"] .intent-pass {
-  color: var(--vote-pass);
+  color: #ffd4cb;
   opacity: var(--intent-strength);
 }
 .swipe-feedback[data-intent="LIKE"] .intent-like {
-  color: var(--vote-like);
+  color: #d8ee69;
   opacity: var(--intent-strength);
 }
 .swipe-feedback[data-intent="SUPER_LIKE"] .intent-super {
-  color: var(--vote-super);
+  color: #b9c7ff;
   opacity: var(--intent-strength);
 }
 .rating .swipe-card .track-art {
@@ -1215,7 +1223,6 @@ select:focus-visible {
   .vote-actions button {
     padding: 8px 4px;
     font-size: 12px;
-    line-height: 1.25;
   }
   .swipe-hint {
     min-height: 0;
