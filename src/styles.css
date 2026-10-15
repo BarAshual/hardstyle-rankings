@@ -804,6 +804,8 @@ select:focus-visible {
 /* Fit the voting controls together on phones; overflow remains available for zoom/error recovery. */
 @media (max-width: 600px) {
   .app:has(.rating) {
+    --rating-bottom-space: max(16px, env(safe-area-inset-bottom, 0px));
+    min-height: 100dvh;
     padding: 0 18px;
   }
   .app:has(.rating) > header {
@@ -811,7 +813,16 @@ select:focus-visible {
     flex: 0 0 56px;
   }
   main:has(> .rating) {
-    padding: 8px 0 16px;
+    display: flex;
+    padding: 8px 0 var(--rating-bottom-space);
+  }
+  .rating {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .rating > * {
+    flex-shrink: 0;
   }
   .app:has(.rating) > footer {
     display: none;
@@ -844,7 +855,17 @@ select:focus-visible {
     line-height: 20px;
   }
   .rating-stage {
-    width: min(100%, clamp(160px, calc(100svh - 390px), 320px));
+    max-width: none;
+    width: min(
+      100%,
+      max(160px, calc(100svh - 374px - var(--rating-bottom-space)))
+    );
+    width: min(
+      100%,
+      max(160px, calc(100dvh - 374px - var(--rating-bottom-space)))
+    );
+    /* Share surplus height around the artwork, keeping the controls near the bottom. */
+    margin-block: auto;
   }
   .rating .swipe-card .placeholder {
     font-size: 32px;

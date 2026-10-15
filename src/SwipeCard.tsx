@@ -88,6 +88,10 @@ export function SwipeCard({
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("blur", cancel);
     window.addEventListener("pagehide", cancel);
+    // Dynamic browser bars and rotation can move/resize a still-active surface.
+    const viewport = window.visualViewport;
+    window.addEventListener("resize", cancel);
+    viewport?.addEventListener("resize", cancel);
     return () => {
       document.removeEventListener("pointerdown", down, true);
       document.removeEventListener("pointerup", end, true);
@@ -95,6 +99,8 @@ export function SwipeCard({
       document.removeEventListener("visibilitychange", hidden);
       window.removeEventListener("blur", cancel);
       window.removeEventListener("pagehide", cancel);
+      window.removeEventListener("resize", cancel);
+      viewport?.removeEventListener("resize", cancel);
       reset();
     };
   }, [cancelDrag, reset]);

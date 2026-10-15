@@ -683,6 +683,53 @@ describe("adaptive scrolling and voting", () => {
       height.mockRestore();
     }
   });
+  it.each(["layout", "visual"])(
+    "cancels an active swipe when the %s viewport resizes even if the page still fits",
+    async (kind) => {
+      const height = vi
+        .spyOn(document.documentElement, "scrollHeight", "get")
+        .mockReturnValue(500);
+      const original = Object.getOwnPropertyDescriptor(
+        window,
+        "visualViewport",
+      );
+      const viewport = Object.assign(new EventTarget(), { height: 700 });
+      Object.defineProperty(window, "visualViewport", {
+        configurable: true,
+        value: viewport,
+      });
+      try {
+        const { api } = fake();
+        mount(api);
+        await screen.findByRole("heading", { name: "Track 1" });
+        const card = screen.getByRole("group", { name: /Swipe to rate/ });
+        expect(card).toHaveAttribute("data-allow-up", "true");
+        fireEvent.pointerDown(card, pointer(0, 0));
+        fireEvent.pointerMove(card, pointer(110, 0));
+        expect(card.style.getPropertyValue("--drag-x")).toBe("110px");
+        viewport.height = 650;
+        act(() =>
+          (kind === "layout" ? window : viewport).dispatchEvent(
+            new Event("resize"),
+          ),
+        );
+        expect(card).toHaveAttribute("data-allow-up", "true");
+        expect(card.style.getPropertyValue("--drag-x")).toBe("0px");
+        fireEvent.pointerUp(card, pointer(110, 0));
+        expect(api.castVote).not.toHaveBeenCalled();
+        expect(readPending(uid, sid)).toBeNull();
+        swipe(110, 0);
+        await screen.findByRole("heading", { name: "Track 2" });
+        expect(api.castVote).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ choice: "LIKE" }),
+        );
+      } finally {
+        height.mockRestore();
+        if (original) Object.defineProperty(window, "visualViewport", original);
+        else Reflect.deleteProperty(window, "visualViewport");
+      }
+    },
+  );
   it("uses the smaller visible viewport when browser chrome or zoom leaves less room", async () => {
     const height = vi
       .spyOn(document.documentElement, "scrollHeight", "get")
