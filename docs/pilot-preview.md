@@ -2,6 +2,8 @@
 
 This is a testable Preview release, not approval to start official voting. No production deployment, production environment change, production database write, or official-season transition was performed during this readiness pass.
 
+**Current acceptance (2026-10-15):** the owner reports completing all 20 tracks, passing the previously discussed phone checks and the offline/recovery test. Oran's 14/20 stop was confirmed intentional. See [the manual acceptance record](pilot-acceptance.md). Remaining [official backup/recovery blockers](official-release-blockers.md) are tracked separately. The dated checks below are chronological evidence; earlier requests for phone confirmation are superseded within the scope of that acceptance record.
+
 ## Release and environment
 
 - Initial UI commit: `a74f99692ed8063cde005e3116fd10397c100abb` on `preview/mobile-pilot-readiness`.
@@ -67,10 +69,7 @@ The export took about 12.9 seconds; archive SQL restore about 0.15 seconds. Thes
 
 ### Recovery limitations that remain open
 
-- The eight `private` importer/provider/source tables were present but empty in this snapshot. Restoring **populated** mappings, source evidence and import/review audits has not been exercised.
-- A full isolated **Cloud** restore and subsequent real Google sign-in, identity continuity and frontend reconnection have not been performed. The local Auth service was disabled for this SQL restore test. There is no unused isolated Cloud project within the current two-project Free setup; paid infrastructure was not provisioned.
-- Managed project configuration, OAuth client configuration/secrets, JWT/signing configuration, Storage objects and other managed services are outside the archive's four-schema scope. Configuration/secret recovery needs its own protected inventory; live OAuth/importer token files should not be archived as backups.
-- Backup frequency, encrypted independent storage, retention, monitoring, RPO/RTO, and the official-vote retention/recovery procedure remain decisions and implementation work. Do not start official voting until an approved recoverable backup process and complete isolated recovery rehearsal exist.
+The populated-importer restore, complete isolated Cloud/Auth recovery, managed configuration inventory and operational backup policy remain open. Their scope and closure evidence are maintained separately in [official-release-blockers.md](official-release-blockers.md). The successful SQL rehearsal and manual offline retry do not close those prerequisites.
 
 ## Owner phone checklist
 
@@ -82,9 +81,9 @@ Use only `PREVIEW TEST — Mobile pilot` in the linked test project. Leave the o
 4. Open Apple Music and Spotify and return. Verify native app/browser handoff, correct recordings and no unintended vote.
 5. Use slow/offline networking: the current track must stay pending; refresh then retry the original action. One logical action must produce one vote/version/event. If only the next-track read fails, retry must read only. Check quota 0, OS Reduce Motion and screen-reader/button access.
 
-The owner reported all three swipe directions and both provider links working on a real phone with the initial Preview. Device/browser details, crossing then returning, slow-network recovery and the subsequent outgoing-motion correction remain to be confirmed physically. Invitation acceptance plus wrong-account rejection across **two real Google accounts** also remains unverified. Two test invitations have since been issued as recorded below; synthetic backend admission tests do not replace the invitees’ real Google handshake. Invited test accounts must also be allowed by the Google OAuth testing audience.
+The owner subsequently reported completion of all 20 tracks and the discussed phone checks, including the offline/recovery test; see [manual acceptance](pilot-acceptance.md). Exact device/browser versions and a new wrong-account rejection test across two real Google accounts were not supplied in that report. Earlier synthetic admission/security checks remain separate evidence; the acceptance does not claim a universal device or identity-test matrix.
 
-**Ready:** reviewable Git branch, isolated hosted Preview, real owner Google sign-in, durable voting/security checks and bounded SQL recovery rehearsal. **Owner checks:** revised outgoing motion and the remaining phone scenarios, plus the second Google account. **Official-release blockers:** the incomplete production backup/recovery process and its populated-data/Cloud-Auth rehearsal; any failures found during those phone/account checks. Preview readiness does not remove these gates in [deployment.md](deployment.md).
+**Ready for UI PR review:** the reviewable Git branch, isolated Preview, automated voting/security checks and owner-reported phone/offline acceptance. The participant's intentional 14/20 stop is resolved. **Official-release blockers:** the separate [backup/recovery prerequisites](official-release-blockers.md); the existing [deployment gates](deployment.md) remain in force. No merge, production deployment or official-season transition is part of this acceptance update.
 
 ## Outgoing-motion correction after owner phone feedback
 
