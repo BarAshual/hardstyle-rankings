@@ -184,7 +184,7 @@ describe("durable rating", () => {
       screen.getByRole("button", { name: "Check for new tracks" }),
     );
     await screen.findByRole("heading", { name: "New release" });
-    await userEvent.click(screen.getByRole("link", { name: "← Season home" }));
+    await userEvent.click(screen.getByRole("link", { name: "← Home" }));
     await screen.findByRole("heading", { name: /Welcome, Duke/ });
     expect(
       screen.getByText("1 track waiting for your take"),

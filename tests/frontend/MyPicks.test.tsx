@@ -153,21 +153,15 @@ describe("My Picks", () => {
     expect(screen.getAllByRole("article")).toHaveLength(1);
     await userEvent.clear(search);
     for (const [filter, title] of [
-      ["LIKE", "Neon Skyline"],
-      ["PASS", "Hidden Frequency"],
-      ["SUPER_LIKE", "Final Echo"],
+      ["Likes", "Neon Skyline"],
+      ["Passes", "Hidden Frequency"],
+      ["Super Likes", "Final Echo"],
     ]) {
-      await userEvent.selectOptions(
-        screen.getByLabelText("Filter choices"),
-        filter,
-      );
+      await userEvent.click(screen.getByRole("button", { name: filter }));
       expect(screen.getAllByRole("article")).toHaveLength(1);
       expect(screen.getByRole("article", { name: title })).toBeInTheDocument();
     }
-    await userEvent.selectOptions(
-      screen.getByLabelText("Filter choices"),
-      "ALL",
-    );
+    await userEvent.click(screen.getByRole("button", { name: "All" }));
     expect(screen.getAllByRole("article")).toHaveLength(3);
     await userEvent.type(search, "missing");
     expect(screen.getByText(/No choices match/)).toBeInTheDocument();
@@ -206,7 +200,7 @@ describe("My Picks", () => {
       expect(f.picks[0].version).toBe(4);
       expect(
         screen.getByText(
-          `${to === "SUPER_LIKE" ? 1 : 2} Super Likes remaining`,
+          `${to === "SUPER_LIKE" ? "1 Super Like" : "2 Super Likes"} available`,
         ),
       ).toBeInTheDocument();
       expect(readPending(uid, sid)).toBeNull();
@@ -373,7 +367,7 @@ describe("My Picks", () => {
     ).toBeInTheDocument();
     expect(choice("LIKE")).toBeDisabled();
   });
-  it("rating can recover an edit from the same pending journal", async () => {
+  it("recovers a pending edit through the direct Rating link and returns to My Picks", async () => {
     const f = fake();
     const action: VoteAction = {
       user_id: uid,
@@ -384,13 +378,22 @@ describe("My Picks", () => {
       action_id: crypto.randomUUID(),
     };
     savePending({ action, track: tracks[0] });
-    mount(f.api, `/seasons/${sid}/rate`);
+    mount(f.api);
+    await loaded();
+    await userEvent.click(screen.getByRole("link", { name: "Rate tracks →" }));
+    await screen.findByRole("link", { name: "My Picks →" });
     await userEvent.click(
       await screen.findByRole("button", { name: "Retry pending vote" }),
     );
     await screen.findByRole("heading", { name: "You’re caught up." });
     expect(f.picks[0].version).toBe(4);
     expect(readPending(uid, sid)).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "My Picks →" }));
+    await loaded();
+    expect(
+      card().getByText("PASS", { selector: "strong" }),
+    ).toBeInTheDocument();
+    expect(f.api.castVote).toHaveBeenCalledOnce();
   });
   it("preserves edits across reload and uses their new version for another edit", async () => {
     const f = fake();
@@ -517,10 +520,7 @@ describe("My Picks", () => {
       screen.getByRole("article", { name: "Track 1001" }),
     ).toBeInTheDocument();
     await userEvent.clear(search);
-    await userEvent.selectOptions(
-      screen.getByLabelText("Filter choices"),
-      "SUPER_LIKE",
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Super Likes" }));
     expect(screen.getAllByRole("article")).toHaveLength(1);
     expect(
       screen.getByRole("article", { name: "Track 1001" }),
@@ -547,7 +547,10 @@ describe("My Picks", () => {
     expect(
       screen.getByRole("searchbox", { name: "Search title or artist" }),
     ).toHaveValue("Tail");
-    expect(screen.getByLabelText("Filter choices")).toHaveValue("SUPER_LIKE");
+    expect(screen.getByRole("button", { name: "Super Likes" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(screen.getByText("Showing 1–1 of 1 picks")).toBeInTheDocument();
   });
   it("clamps the page after an edit removes the last filtered result without sending another vote", async () => {

@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useAuth } from "./auth";
 import { uuidPattern, type Choice, type Home, type Track } from "./api";
 import { MusicLinks } from "./MusicLinks";
+import { SeasonNavigation } from "./SeasonNavigation";
 import { SwipeCard } from "./SwipeCard";
 import { EXIT_MS } from "./swipe";
 import { rejected } from "./voteErrors";
@@ -266,10 +267,11 @@ function RatingSession({ seasonId }: { seasonId: string }) {
   return (
     <section className="rating">
       <div className="rating-context">
-        <Link to={`/seasons/${seasonId}`} className="back-link">
-          ← Season home
-        </Link>
-        <p className="eyebrow">{home?.season.name ?? "Your season"}</p>
+        <SeasonNavigation
+          seasonId={seasonId}
+          current="rating"
+          seasonName={home?.season.name ?? "Your season"}
+        />
       </div>
       <p className="rating-progress">
         {home

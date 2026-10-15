@@ -5,12 +5,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "./auth";
 import { uuidPattern, type Choice, type Home, type Pick } from "./api";
 import { rejected } from "./voteErrors";
 import { Artwork } from "./Artwork";
 import { MusicLinks } from "./MusicLinks";
+import { SeasonNavigation } from "./SeasonNavigation";
 import {
   confirmPending,
   readPending,
@@ -21,6 +22,13 @@ import {
 
 const choices: Choice[] = ["PASS", "SUPER_LIKE", "LIKE"];
 const labels = { PASS: "PASS", LIKE: "LIKE", SUPER_LIKE: "SUPER LIKE" };
+const symbols = { PASS: "←", SUPER_LIKE: "↑", LIKE: "→" };
+const filters = [
+  { value: "ALL", label: "All" },
+  { value: "LIKE", label: "Likes" },
+  { value: "SUPER_LIKE", label: "Super Likes" },
+  { value: "PASS", label: "Passes" },
+] as const;
 const pageSize = 25;
 
 function PicksPagination({
@@ -268,14 +276,46 @@ function PicksSession({ seasonId }: { seasonId: string }) {
   const closed = home?.season.state !== "VOTING";
   return (
     <section className="picks">
-      <Link className="back-link" to={`/seasons/${seasonId}`}>
-        ← Season home
-      </Link>
-      <p className="eyebrow">{home?.season.name ?? "Your season"}</p>
-      <h1>My Picks</h1>
-      <p>Your choices, visible only to you.</p>
-      {home && (
-        <p>{home.progress.super_likes_available} Super Likes remaining</p>
+      <SeasonNavigation seasonId={seasonId} current="picks" />
+      <p className="eyebrow picks-season">
+        {home?.season.name ?? "Your season"}
+      </p>
+      <div className="picks-heading">
+        <h1>My Picks</h1>
+        <button
+          className="picks-refresh"
+          disabled={busy || refreshing}
+          aria-label="Refresh picks"
+          aria-busy={refreshing}
+          onClick={refresh}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.55-1L20 9M4 15l2.35 3A7 7 0 0 0 17.9 17" />
+          </svg>
+          <span className="sr-only">
+            {refreshing && ready ? "Refreshing picks…" : "Refresh picks"}
+          </span>
+        </button>
+      </div>
+      {home && ready && (
+        <p className="picks-summary">
+          {picks.length} {picks.length === 1 ? "pick" : "picks"} ·{" "}
+          <span>
+            {home.progress.super_likes_available} Super{" "}
+            {home.progress.super_likes_available === 1 ? "Like" : "Likes"}{" "}
+            available
+          </span>
+        </p>
       )}
       {message && (
         <p role="status" className="notice">
@@ -287,9 +327,6 @@ function PicksSession({ seasonId }: { seasonId: string }) {
           {loadError}
         </p>
       )}
-      <button disabled={busy || refreshing} onClick={refresh}>
-        {refreshing && ready ? "Refreshing picks…" : "Refresh picks"}
-      </button>
       {!ready ? (
         !loadError && <p>Loading your latest choices…</p>
       ) : (
@@ -315,26 +352,46 @@ function PicksSession({ seasonId }: { seasonId: string }) {
             </aside>
           )}
           <div className="picks-controls">
-            <label htmlFor="picks-search">Search title or artist</label>
-            <input
-              id="picks-search"
-              type="search"
-              value={search}
-              onChange={(e) => changeView(e.target.value, filter)}
-            />
-            <label htmlFor="picks-filter">Filter choices</label>
-            <select
-              id="picks-filter"
-              value={filter}
-              onChange={(e) =>
-                changeView(search, e.target.value as Choice | "ALL")
-              }
+            <label className="picks-search" htmlFor="picks-search">
+              <span className="sr-only">Search title or artist</span>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="10.5" cy="10.5" r="6.5" />
+                <path d="m16 16 4 4" />
+              </svg>
+              <input
+                id="picks-search"
+                type="search"
+                placeholder="Search title or artist"
+                value={search}
+                onChange={(e) => changeView(e.target.value, filter)}
+              />
+            </label>
+            <div
+              className="picks-filters"
+              role="group"
+              aria-label="Filter choices"
             >
-              <option value="ALL">All</option>
-              <option value="LIKE">Likes</option>
-              <option value="SUPER_LIKE">Super Likes</option>
-              <option value="PASS">Passes</option>
-            </select>
+              {filters.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  aria-pressed={filter === item.value}
+                  aria-controls="picks-list"
+                  onClick={() => changeView(search, item.value)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
           {!picks.length ? (
             <p>No picks yet. Rate your first track to see it here.</p>
@@ -368,8 +425,18 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                         <div className="pick-copy">
                           <h2>{p.title}</h2>
                           <p>{p.artists.join(" & ") || "Artist unavailable"}</p>
-                          <p>
-                            Current choice: <strong>{labels[p.choice]}</strong>
+                          <p className="pick-choice">
+                            <span className="sr-only">Current choice: </span>
+                            <strong data-choice={p.choice}>
+                              <span aria-hidden="true">
+                                {p.choice === "LIKE"
+                                  ? "✓"
+                                  : p.choice === "SUPER_LIKE"
+                                    ? "↑"
+                                    : "−"}
+                              </span>
+                              {labels[p.choice]}
+                            </strong>
                           </p>
                           {!p.active && (
                             <p className="fine">
@@ -387,6 +454,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                             {choices.map((c) => (
                               <button
                                 key={c}
+                                data-choice={c}
                                 aria-pressed={p.choice === c}
                                 disabled={
                                   busy ||
@@ -399,6 +467,9 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                                 }
                                 onClick={() => void edit(p, c)}
                               >
+                                <span aria-hidden="true">
+                                  {p.choice === c ? "✓" : symbols[c]}
+                                </span>
                                 {labels[c]}
                               </button>
                             ))}
@@ -419,6 +490,9 @@ function PicksSession({ seasonId }: { seasonId: string }) {
               )}
             </>
           )}
+          <p className="fine picks-privacy">
+            Your choices, visible only to you.
+          </p>
         </>
       )}
     </section>
