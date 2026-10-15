@@ -189,9 +189,7 @@ describe("durable rating", () => {
     expect(
       screen.getByText("1 track waiting for your take"),
     ).toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole("link", { name: /Continue rating/ }),
-    );
+    await userEvent.click(screen.getByRole("link", { name: "Rate tracks" }));
     await screen.findByRole("heading", { name: "New release" });
   });
   it("explains the Super Like limit and permits another choice with a new action", async () => {
