@@ -324,22 +324,26 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       </div>
       <MusicLinks track={track} />
       <div className="vote-actions">
-        <button disabled={!enabled} onClick={() => void submit("PASS")}>
-          ← PASS
+        <button
+          data-choice="PASS"
+          disabled={!enabled}
+          onClick={() => void submit("PASS")}
+        >
+          <span aria-hidden="true">✕</span> PASS
         </button>
         <button
-          className="super"
+          data-choice="SUPER_LIKE"
           disabled={!enabled || home?.progress.super_likes_available === 0}
           onClick={() => void submit("SUPER_LIKE")}
         >
-          ↑ SUPER LIKE
+          <span aria-hidden="true">↑</span> SUPER LIKE
         </button>
         <button
-          className="like"
+          data-choice="LIKE"
           disabled={!enabled}
           onClick={() => void submit("LIKE")}
         >
-          LIKE →
+          <span aria-hidden="true">✓</span> LIKE
         </button>
       </div>
       <div id="swipe-hint" className="swipe-hint">

@@ -6,6 +6,9 @@
   font-weight: 400;
   line-height: 1.55;
   color-scheme: dark;
+  --vote-pass: #f0808c;
+  --vote-like: #71c79a;
+  --vote-super: #d8ee69;
 }
 * {
   box-sizing: border-box;
@@ -499,13 +502,33 @@ footer {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
-.vote-actions .super {
-  border-color: #d8ee69;
-  color: #d8ee69;
+.vote-actions [data-choice="PASS"],
+.pick-choice [data-choice="PASS"] {
+  --choice-color: var(--vote-pass);
 }
-.vote-actions .like {
-  background: #d8ee69;
+.vote-actions [data-choice="LIKE"],
+.pick-choice [data-choice="LIKE"] {
+  --choice-color: var(--vote-like);
+}
+.vote-actions [data-choice="SUPER_LIKE"],
+.pick-choice [data-choice="SUPER_LIKE"] {
+  --choice-color: var(--vote-super);
+}
+.vote-actions button {
+  gap: 5px;
+  border-radius: 10px;
+}
+.rating .vote-actions button {
+  color: var(--choice-color);
+  border-color: var(--choice-color);
+  background: #19191d;
+}
+.rating .vote-actions button[data-choice="SUPER_LIKE"] {
   color: #14160c;
+  background: var(--choice-color);
+}
+.vote-actions button:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--choice-color);
 }
 
 @media (max-width: 480px) {
@@ -720,10 +743,7 @@ select:focus-visible {
   gap: 4px;
   font-size: 11px;
   font-weight: 500;
-  color: #d8ee69;
-}
-.pick-choice strong[data-choice="PASS"] {
-  color: #b4b4bd;
+  color: var(--choice-color);
 }
 .pick-controls {
   grid-column: 1 / -1;
@@ -761,20 +781,14 @@ select:focus-visible {
   line-height: 1.25;
   font-weight: 500;
 }
-.pick-actions button[data-choice="SUPER_LIKE"] {
-  color: #d8ee69;
-}
-.pick-actions button[aria-pressed="true"] {
-  border-color: #d8ee69;
-  background: #d8ee69;
+.picks .pick-actions button[aria-pressed="true"] {
+  border-color: var(--choice-color);
+  box-shadow: inset 0 0 0 1px var(--choice-color);
+  background: var(--choice-color);
   color: #14160c;
+  font-weight: 600;
   opacity: 1;
   cursor: default;
-}
-.pick-actions button[data-choice="PASS"][aria-pressed="true"] {
-  border-color: #b4b4bd;
-  background: #242428;
-  color: #f3f0e8;
 }
 .picks-privacy {
   margin: 20px 0 0;
@@ -832,7 +846,9 @@ select:focus-visible {
   border-radius: 10px;
 }
 .music-link {
-  border: 1px solid transparent;
+  border: 1px solid #38383e;
+  background: #19191d;
+  color: #f3f0e8;
   padding: 0 12px;
   gap: 12px;
   font-size: 14px;
@@ -846,13 +862,9 @@ select:focus-visible {
   flex: 0 0 24px;
   object-fit: contain;
 }
-.apple-link {
-  background: #e71935;
-  color: #fff;
-}
-.spotify-link {
-  background: #1ed760;
-  color: #000;
+.music-link:hover {
+  border-color: #777780;
+  background: #242428;
 }
 .music-unavailable {
   border: 1px dashed #55555a;
@@ -940,15 +952,15 @@ select:focus-visible {
   opacity: 0;
 }
 .swipe-feedback[data-intent="PASS"] .intent-pass {
-  color: #ffd4cb;
+  color: var(--vote-pass);
   opacity: var(--intent-strength);
 }
 .swipe-feedback[data-intent="LIKE"] .intent-like {
-  color: #d8ee69;
+  color: var(--vote-like);
   opacity: var(--intent-strength);
 }
 .swipe-feedback[data-intent="SUPER_LIKE"] .intent-super {
-  color: #b9c7ff;
+  color: var(--vote-super);
   opacity: var(--intent-strength);
 }
 .rating .swipe-card .track-art {
@@ -1203,6 +1215,7 @@ select:focus-visible {
   .vote-actions button {
     padding: 8px 4px;
     font-size: 12px;
+    line-height: 1.25;
   }
   .swipe-hint {
     min-height: 0;

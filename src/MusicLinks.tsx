@@ -1,6 +1,6 @@
 import type { Track } from "./api";
-import appleIcon from "./assets/apple-music-icon-white.svg";
-import spotifyIcon from "./assets/spotify-icon-black.svg";
+import appleIcon from "./assets/apple-music-icon-color.svg";
+import spotifyIcon from "./assets/spotify-icon-green.svg";
 
 export function musicURL(
   value: string | null,
