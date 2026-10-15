@@ -4,6 +4,8 @@ This is a testable Preview release, not approval to start official voting. No pr
 
 **Current acceptance (2026-10-15):** the owner reports completing all 20 tracks, passing the previously discussed phone checks and the offline/recovery test. Oran's 14/20 stop was confirmed intentional. See [the manual acceptance record](pilot-acceptance.md). Remaining [official backup/recovery blockers](official-release-blockers.md) are tracked separately. The dated checks below are chronological evidence; earlier requests for phone confirmation are superseded within the scope of that acceptance record.
 
+**Post-acceptance UI follow-up:** routine pending/saving/success messages have since been removed from Rating and My Picks at the owner's request. Error/recovery feedback remains. This revision needs a fresh phone check; the earlier acceptance does not automatically cover it. See [error-only feedback](#error-only-voting-feedback-2026-10-15).
+
 ## Release and environment
 
 - Initial UI commit: `a74f99692ed8063cde005e3116fd10397c100abb` on `preview/mobile-pilot-readiness`.
@@ -151,3 +153,11 @@ All **126 frontend tests**, typecheck, ESLint and build passed. Actual-component
 The owner approved the combined clean-card/compact-list mockup. My Picks now has subtle bordered cards, 48 px artwork, close track copy, equal listening/edit rows and a compact search/filter/refresh header. Apple Music remains red, Spotify green, and edit buttons remain PASS / SUPER LIKE / LIKE. Shared native Home and Rate tracks/My Picks links give both screens direct access to the other; Rating keeps its season context in the same mobile row.
 
 All **126 frontend tests**, typecheck, lint and build passed. The existing 1001-pick pagination/filter/URL regressions pass with the new filter buttons. A pending-edit test now uses the direct links and confirms exactly one accepted action. Fictional-data browser checks covered narrow/large phones and desktop, long text and a closed season; Rating controls stayed inside the four tested normal phone viewports. Browser testing did not write Cloud votes. On a real phone, review card density, direct links, search/filter/page restoration and the existing return-from-listening scroll position. Database/RLS, invitations, environment settings, official season and production are unchanged.
+
+## Error-only voting feedback (2026-10-15)
+
+The routine pending panel opened immediately after journaling every vote, changed the mobile height budget and made the screen jump. My Picks also inserted a success notice after confirmation. Both screens now keep routine saving and success silent, with controls disabled until the existing confirmation/refresh path completes. Only a failure or restored unconfirmed action presents a friendly explanation and Try again; retrying keeps that explanation in place. The journal, accepted receipt, replay identity, duplicate guard, authoritative progress and delayed branded next-track loader remain intact.
+
+All **126 frontend tests**, typecheck, lint and build passed. Actual-component fictional-data browser checks used ten-second requests: 390×850 Rating had identical artwork/action bounds before/during/after a swipe; 320×568 also held its bounds during a swipe, with neither normal viewport overflowing. My Picks kept its document height and card positions through a slow edit and authoritative refresh. Lost-response recovery succeeded on both screens, with no success notice; Rating's recovery controls also stayed steady during replay. Exact-action/duplicate/storage/quota/closed-state regressions still pass. These checks do not mutate Cloud votes or replace native-phone acceptance.
+
+Phone review for this follow-up: refresh the same Preview, swipe through choices and edit an existing My Picks choice; neither action should insert routine status text or shift controls. Check an offline/unconfirmed action still offers a clear recovery path. No new Cloud votes, production deployment or official-season change is part of agent verification.

@@ -129,6 +129,11 @@ function PicksSession({ seasonId }: { seasonId: string }) {
       setHome(currentHome);
       setPicks(currentPicks);
       setPending(saved);
+      if (saved) {
+        setMessage(
+          "We couldn’t confirm your last change. Try again before making another choice.",
+        );
+      }
       setReady(true);
     }
     load()
@@ -174,7 +179,8 @@ function PicksSession({ seasonId }: { seasonId: string }) {
       return;
     submitting.current = true;
     setBusy(true);
-    setMessage("");
+    // Keep recovery visible while retrying; normal edits add no status UI.
+    if (!pending) setMessage("");
     let saved: PendingVote;
     try {
       // Another screen/tab may already have an uncertain action. Reconcile it first.
@@ -204,7 +210,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
       await confirmPending(api, saved);
       if (!mounted.current) return;
       setPending(null);
-      setMessage("Vote saved.");
+      setMessage("");
       scheduleRefresh();
       // Always reread current votes: an idempotent receipt may predate another device's edit.
     } catch (error) {
@@ -230,7 +236,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
         }
       } else {
         setMessage(
-          "We couldn’t confirm this edit. Retry the same action safely. If your session expired, sign in again with the same account.",
+          "We couldn’t confirm this edit. Check your connection and try again. If you need to sign in, use the same account.",
         );
       }
     } finally {
@@ -317,11 +323,24 @@ function PicksSession({ seasonId }: { seasonId: string }) {
           </span>
         </p>
       )}
-      {message && (
-        <p role="status" className="notice">
+      <div className={message ? "notice picks-feedback" : undefined}>
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={message ? undefined : "sr-only"}
+        >
           {message}
         </p>
-      )}
+        {message && pending && (
+          <button
+            disabled={busy || refreshing || !!loadError}
+            onClick={() => void edit()}
+          >
+            Try again
+          </button>
+        )}
+      </div>
       {loadError && (
         <p role="status" className="notice">
           {loadError}
@@ -336,20 +355,6 @@ function PicksSession({ seasonId }: { seasonId: string }) {
               Voting is closed or hasn’t opened yet. You can still view your
               choices.
             </p>
-          )}
-          {pending && (
-            <aside className="entry-card" aria-label="Pending vote">
-              <p>
-                Awaiting confirmation: {pending.track.title} →{" "}
-                {labels[pending.action.choice]}
-              </p>
-              <button
-                disabled={busy || refreshing || !!loadError}
-                onClick={() => void edit()}
-              >
-                {busy ? "Saving vote…" : "Retry pending vote"}
-              </button>
-            </aside>
           )}
           <div className="picks-controls">
             <label className="picks-search" htmlFor="picks-search">

@@ -262,7 +262,7 @@ describe("My Picks", () => {
     view.unmount();
     mount(f.api);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await waitFor(() => expect(readPending(uid, sid)).toBeNull());
     await loaded();
@@ -285,7 +285,7 @@ describe("My Picks", () => {
     savePending({ action, track: tracks[0] });
     mount(f.api);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await waitFor(() => expect(readPending(uid, sid)).toBeNull());
     await loaded();
@@ -320,7 +320,12 @@ describe("My Picks", () => {
     fireEvent.click(pass);
     fireEvent.click(pass);
     expect(api.castVote).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Saving vote…" })).toBeDisabled();
+    expect(pass).toBeDisabled();
+    expect(readPending(uid, sid)).not.toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Try again" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Awaiting confirmation/)).not.toBeInTheDocument();
     await act(async () =>
       resolve({
         ...api.castVote.mock.calls[0][0],
@@ -328,6 +333,7 @@ describe("My Picks", () => {
         accepted_at: "now",
       }),
     );
+    expect(screen.queryByText("Vote saved.")).not.toBeInTheDocument();
   });
   it("handles locking mid-edit and still displays own picks", async () => {
     const f = fake();
@@ -358,7 +364,7 @@ describe("My Picks", () => {
     f.lock();
     mount(f.api);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await waitFor(() => expect(readPending(uid, sid)).toBeNull());
     await loaded();
@@ -383,7 +389,7 @@ describe("My Picks", () => {
     await userEvent.click(screen.getByRole("link", { name: "Rate tracks →" }));
     await screen.findByRole("link", { name: "My Picks →" });
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await screen.findByRole("heading", { name: "You’re caught up." });
     expect(f.picks[0].version).toBe(4);

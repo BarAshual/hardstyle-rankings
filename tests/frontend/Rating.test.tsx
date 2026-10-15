@@ -128,11 +128,19 @@ describe("durable rating", () => {
     expect(
       screen.getByRole("heading", { name: "Track 1" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Saving vote…" })).toBeDisabled();
+    expect(pass).toBeDisabled();
+    expect(readPending(uid, sid)).not.toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Try again" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Saving your choice|Pending:/),
+    ).not.toBeInTheDocument();
     const action = api.castVote.mock.calls[0][0];
     await act(async () =>
       resolve({ ...action, version: 1, accepted_at: "now" }),
     );
+    expect(screen.queryByText(/Vote saved|Confirmed/)).not.toBeInTheDocument();
   });
   it("does not advance on an uncertain failure and replays the identical action after reload", async () => {
     const { api, votes } = fake();
@@ -151,9 +159,7 @@ describe("durable rating", () => {
     view.unmount();
     mount(api);
     await screen.findByRole("heading", { name: "Track 1" });
-    await userEvent.click(
-      screen.getByRole("button", { name: "Retry pending vote" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByRole("heading", { name: "Track 2" });
     expect(api.castVote.mock.calls[1][0]).toEqual(original);
     expect(votes.size).toBe(1);
@@ -233,10 +239,8 @@ describe("durable rating", () => {
     votes.set(tracks[0].id, "LIKE");
     lock();
     mount(api);
-    await screen.findByRole("button", { name: "Retry pending vote" });
-    await userEvent.click(
-      screen.getByRole("button", { name: "Retry pending vote" }),
-    );
+    await screen.findByRole("button", { name: "Try again" });
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByRole("heading", { name: "Voting is closed." });
     expect(api.castVote).toHaveBeenCalledWith(action);
   });

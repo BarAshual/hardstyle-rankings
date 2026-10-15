@@ -583,6 +583,12 @@ main:has(> .picks) {
 .picks-summary span {
   color: #d8ee69;
 }
+.picks-feedback > p {
+  margin: 0;
+}
+.picks-feedback > button {
+  margin-top: 12px;
+}
 .picks-controls {
   margin: 16px 0 0;
 }
@@ -1037,9 +1043,6 @@ select:focus-visible {
 .rating-recovery {
   min-height: 0;
 }
-.rating-recovery p {
-  margin: 6px 0;
-}
 .rating-recovery .primary {
   margin: 0;
   justify-content: center;
@@ -1206,12 +1209,5 @@ select:focus-visible {
     font-size: 11px;
     line-height: 18px;
     margin: 6px 0 0;
-  }
-  .rating-save-note {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
   }
 }

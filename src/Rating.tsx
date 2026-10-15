@@ -59,7 +59,6 @@ function RatingSession({ seasonId }: { seasonId: string }) {
   const [ready, setReady] = useState(false);
   const [readError, setReadError] = useState(false);
   const [message, setMessage] = useState("");
-  const [success, setSuccess] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [exit, setExit] = useState<Choice | null>(null);
   const [entering, setEntering] = useState(false);
@@ -118,9 +117,8 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       setEntering(!!leaving && !!next && !reduced);
       setReady(true);
       if (saved) {
-        setSuccess(false);
         setMessage(
-          "A vote is awaiting confirmation. Retry it safely before continuing.",
+          "We couldn’t confirm your last choice. Try again before continuing.",
         );
       }
     }
@@ -129,7 +127,6 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       if (active) {
         setTrack(null);
         setReadError(true);
-        setSuccess(false);
         setMessage(
           "We couldn’t load your rating session or pending vote. Check your connection and browser storage, then try again.",
         );
@@ -187,14 +184,14 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       choice === "SUPER_LIKE" &&
       home?.progress.super_likes_available === 0
     ) {
-      setSuccess(false);
       setMessage(rejected.super_like_limit);
       return false;
     }
     submitting.current = true; // Synchronous guard covers repeated release/click events.
     setBusy(true);
-    setSuccess(false);
-    setMessage("Saving your choice…");
+    // Keep an existing recovery explanation mounted during its retry.
+    // A newly journaled action is ordinary in-flight work, not an error.
+    if (!pending) setMessage("");
     let actionPending: PendingVote;
     try {
       actionPending = pending ??
@@ -225,8 +222,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       if (!mounted.current) return false;
       setPending(null);
       setReady(false);
-      setSuccess(true);
-      setMessage("Vote saved. Loading the next track.");
+      setMessage("");
       departure.current = actionPending.action.choice;
       setExit(actionPending.action.choice);
       setAttempt((n) => n + 1);
@@ -252,7 +248,7 @@ function RatingSession({ seasonId }: { seasonId: string }) {
         }
       } else {
         setMessage(
-          "We couldn’t confirm this vote. Retry the same action safely—even if it already reached the server. You can also sign in again if your session expired.",
+          "We couldn’t confirm this vote. Check your connection and try again. If you need to sign in, use the same account.",
         );
       }
       return false;
@@ -348,13 +344,9 @@ function RatingSession({ seasonId }: { seasonId: string }) {
       </div>
       <div id="swipe-hint" className="swipe-hint">
         <span className="swipe-instruction">
-          {busy
-            ? "Saving your choice…"
-            : exit
-              ? "Confirmed"
-              : allowUp
-                ? "Swipe ← Pass · ↑ Super Like · Like →"
-                : "Swipe ← or → · Super Like with the button"}
+          {allowUp
+            ? "Swipe ← Pass · ↑ Super Like · Like →"
+            : "Swipe ← or → · Super Like with the button"}
         </span>
         <div ref={feedback} className="swipe-feedback" aria-hidden="true">
           <span className="intent-pass">← PASS</span>
@@ -367,30 +359,22 @@ function RatingSession({ seasonId }: { seasonId: string }) {
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className={success || busy || !message ? "sr-only" : "rating-message"}
+          className={message ? "rating-message" : "sr-only"}
         >
           {message}
         </p>
       </div>
       <div className="rating-recovery">
-        {pending && (
-          <>
-            <p className="fine">
-              Pending: {pending.action.choice.replace("_", " ")}
-            </p>
-            <button
-              className="primary"
-              disabled={busy}
-              onClick={() => void submit()}
-            >
-              {busy ? "Saving vote…" : "Retry pending vote"}
-            </button>
-          </>
+        {pending && message && (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => void submit()}
+          >
+            Try again
+          </button>
         )}
       </div>
-      <p className="fine rating-save-note">
-        Your choice is saved before the next track appears.
-      </p>
     </section>
   );
 }
