@@ -13,6 +13,10 @@
 body {
   margin: 0;
 }
+/* Clip outgoing cards at the viewport, without creating a vertical scroll container. */
+#root:has(.rating) {
+  overflow-x: clip;
+}
 button,
 input {
   font: inherit;
@@ -181,6 +185,133 @@ input {
   border-radius: 4px;
   background: #19191d;
   color: #fff;
+}
+main:has(> .home) {
+  padding: 32px 0 48px;
+}
+.home > .eyebrow {
+  line-height: 1.5;
+  letter-spacing: 1.4px;
+  overflow-wrap: anywhere;
+}
+.home h1 {
+  font-size: clamp(46px, 8vw, 64px);
+  margin: 14px 0 16px;
+}
+.home .status {
+  margin: 0 0 22px;
+}
+.home-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.home-action {
+  min-width: 0;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 14px;
+  border: 1px solid #38383e;
+  border-radius: 10px;
+  background: #242428;
+  color: #f3f0e8;
+  text-decoration: none;
+}
+.home-action-rating {
+  background: #d8ee69;
+  color: #14160c;
+  border-color: #d8ee69;
+}
+.home-action:hover {
+  filter: brightness(1.06);
+}
+.home-action svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.home-action-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.home-action-copy strong {
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.home-action-help {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.home .progress-card {
+  margin-top: 22px;
+  padding: 18px;
+  border-radius: 12px;
+}
+.home-progress-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.home-progress-summary .track-total {
+  margin: 0;
+}
+.home .track-total strong {
+  font-size: 48px;
+}
+.home .track-total span {
+  font-size: 28px;
+}
+.home-progress-summary > p + p {
+  margin: 0;
+  color: #b4b4bd;
+  font-size: 12px;
+}
+.home progress {
+  display: block;
+  margin: 14px 0 9px;
+}
+.home .progress-card > .fine {
+  margin: 0;
+}
+.home .super-likes {
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 13px;
+}
+.home .super-likes > span {
+  font-size: 22px;
+}
+.home .super-likes strong {
+  font-size: 13px;
+}
+.home .footnote {
+  margin-top: 20px;
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .app:has(.home) {
+    padding: 0 20px;
+  }
+  .app:has(.home) > header {
+    height: 68px;
+    flex: 0 0 68px;
+  }
+  main:has(> .home) {
+    padding: 24px 0 32px;
+  }
+  .home h1 {
+    font-size: 46px;
+  }
 }
 .home h1 span {
   color: #d8ee69;
@@ -363,22 +494,12 @@ footer {
   color: #b4b4bd;
   margin-top: 0;
 }
-.music-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  margin: 20px 0;
-  font-size: 13px;
-  color: #b4b4bd;
-}
 .vote-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 .vote-actions .super {
-  grid-column: 1 / -1;
   border-color: #d8ee69;
   color: #d8ee69;
 }
@@ -393,11 +514,133 @@ footer {
   }
 }
 
-.picks-controls {
-  margin: 24px 0;
+.season-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
 }
-.picks-controls label {
-  margin-top: 14px;
+.season-navigation a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  flex-shrink: 0;
+  color: #b4b4bd;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.season-navigation a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.season-navigation .season-navigation-next {
+  color: #d8ee69;
+}
+.season-navigation-season {
+  min-width: 0;
+  font-size: 10px;
+  letter-spacing: 1px;
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+main:has(> .picks) {
+  padding: 16px 0 40px;
+}
+.picks-season {
+  margin: 4px 0 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 1px;
+  overflow-wrap: anywhere;
+}
+.picks-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.picks-heading h1 {
+  margin: 0;
+  font-size: 46px;
+}
+.picks-refresh {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #38383e;
+  border-radius: 10px;
+  background: transparent;
+  color: #b4b4bd;
+}
+.picks-summary {
+  margin: 10px 0 16px;
+  font-size: 12px;
+  color: #b4b4bd;
+}
+.picks-summary span {
+  color: #d8ee69;
+}
+.picks-feedback > p {
+  margin: 0;
+}
+.picks-feedback > button {
+  margin-top: 12px;
+}
+.picks-controls {
+  margin: 16px 0 0;
+}
+.picks-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #38383e;
+  border-radius: 10px;
+  background: #19191d;
+  color: #b4b4bd;
+}
+.picks-search svg {
+  flex-shrink: 0;
+}
+.picks-search input {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 400;
+}
+.picks-search input::placeholder {
+  color: #b4b4bd;
+  opacity: 1;
+  font-size: 12px;
+}
+.picks-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 8px 0;
+}
+.picks-filters button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 3px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #b4b4bd;
+  font-size: 12px;
+  font-weight: 500;
+}
+.picks-filters button[aria-pressed="true"] {
+  border-color: #38383e;
+  background: #242428;
+  color: #f3f0e8;
 }
 select {
   font: inherit;
@@ -416,43 +659,555 @@ select:focus-visible {
 .picks-list {
   list-style: none;
   padding: 0;
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+}
+.picks-count {
+  margin: 8px 0;
+  font-size: 11px;
+  color: #b4b4bd;
+  scroll-margin-top: 16px;
+}
+.picks-pagination {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  text-align: center;
+  font-size: 13px;
+}
+.picks-pagination button {
+  padding: 8px 4px;
+  font-size: 13px;
 }
 .pick-card {
-  border-top: 1px solid #38383e;
-  padding: 24px 0;
+  border: 1px solid #38383e;
+  border-radius: 10px;
+  background: #19191d;
+  padding: 12px;
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
 }
 .pick-card .track-art {
-  width: 80px;
+  width: 48px;
   margin: 0;
-  font-size: 14px;
+  font-size: 11px;
   gap: 4px;
+  border-radius: 5px;
 }
-.pick-card h2 {
+.pick-copy {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
+.pick-card h2 {
+  margin: 0 0 3px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.pick-copy > p {
+  margin: 3px 0 0;
+}
 .pick-card p {
-  font-size: 14px;
+  font-size: 12px;
+}
+.pick-choice strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #d8ee69;
+}
+.pick-choice strong[data-choice="PASS"] {
+  color: #b4b4bd;
+}
+.pick-controls {
+  grid-column: 1 / -1;
+}
+.pick-card .music-links {
+  margin: 8px 0;
+}
+.pick-card .music-links .music-caption {
+  display: none;
+}
+.pick-card .music-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.pick-card .music-link,
+.pick-card .music-unavailable {
+  height: 44px;
+}
+.pick-card .music-link {
+  padding: 0 12px;
+  gap: 12px;
+  font-size: 12px;
 }
 .pick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
-.pick-actions button {
-  padding: 10px;
-  font-size: 12px;
+.picks .pick-actions button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 7px 3px;
+  gap: 3px;
+  border-color: #38383e;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 500;
+}
+.pick-actions button[data-choice="SUPER_LIKE"] {
+  color: #d8ee69;
 }
 .pick-actions button[aria-pressed="true"] {
   border-color: #d8ee69;
-  color: #d8ee69;
+  background: #d8ee69;
+  color: #14160c;
   opacity: 1;
   cursor: default;
 }
-@media (max-width: 380px) {
-  .pick-card {
-    grid-template-columns: 1fr;
+.pick-actions button[data-choice="PASS"][aria-pressed="true"] {
+  border-color: #b4b4bd;
+  background: #242428;
+  color: #f3f0e8;
+}
+.picks-privacy {
+  margin: 20px 0 0;
+}
+@media (max-width: 600px) {
+  .app:has(.picks) {
+    padding: 0 20px;
+  }
+  .app:has(.picks) > header {
+    height: 68px;
+    flex: 0 0 68px;
+  }
+  main:has(> .picks) {
+    padding-top: 8px;
+  }
+}
+@media (max-width: 360px) {
+  .picks-filters button {
+    font-size: 11px;
+  }
+  .pick-card .music-link {
+    padding: 0 6px;
+    font-size: 11px;
+  }
+  .pick-card .spotify-link {
+    padding-inline: 12px;
+  }
+}
+
+/* Provider artwork is untouched and never part of the moving card. */
+.music-links {
+  width: 100%;
+  margin: 16px 0;
+}
+.music-links .music-caption {
+  margin: 0 0 8px;
+  color: #b4b4bd;
+  font-size: 12px;
+  line-height: 18px;
+}
+.music-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+  gap: 12px;
+}
+.music-link,
+.music-unavailable {
+  height: 52px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 10px;
+}
+.music-link {
+  border: 1px solid transparent;
+  padding: 0 12px;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.music-link img {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  object-fit: contain;
+}
+.apple-link {
+  background: #e71935;
+  color: #fff;
+}
+.spotify-link {
+  background: #1ed760;
+  color: #000;
+}
+.music-unavailable {
+  border: 1px dashed #55555a;
+  padding: 8px;
+  font-size: 12px;
+}
+@media (max-width: 360px) {
+  .music-link {
+    padding: 0 8px;
+    font-size: 13px;
+  }
+}
+.rating-progress {
+  min-height: 40px;
+  margin: 10px 0 0;
+}
+.rating-message-slot {
+  min-height: 0;
+}
+.rating-message {
+  font-size: 13px;
+  color: #ffd4cb;
+  margin: 4px 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.rating-stage {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  position: relative;
+  /* Let confirmed cards leave the frame and travel to the viewport edge. */
+  overflow: visible;
+  border-radius: 12px;
+}
+.swipe-card {
+  --drag-x: 0px;
+  --drag-y: 0px;
+  --drag-rotation: 0deg;
+  --intent-strength: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  transform: translate(var(--drag-x), var(--drag-y))
+    rotate(var(--drag-rotation));
+  transition: transform 210ms ease-out;
+  position: relative;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.swipe-card[data-enabled="true"] {
+  touch-action: pan-y pinch-zoom;
+  cursor: grab;
+}
+.swipe-card[data-enabled="true"][data-allow-up="true"] {
+  touch-action: pinch-zoom;
+}
+.swipe-card[data-dragging="true"] {
+  transition: none;
+  cursor: grabbing;
+}
+.swipe-feedback {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.swipe-feedback span {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  font-weight: 800;
+  font-size: 14px;
+  opacity: 0;
+}
+.swipe-feedback[data-intent="PASS"] .intent-pass {
+  color: #ffd4cb;
+  opacity: var(--intent-strength);
+}
+.swipe-feedback[data-intent="LIKE"] .intent-like {
+  color: #d8ee69;
+  opacity: var(--intent-strength);
+}
+.swipe-feedback[data-intent="SUPER_LIKE"] .intent-super {
+  color: #b9c7ff;
+  opacity: var(--intent-strength);
+}
+.rating .swipe-card .track-art {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: none;
+  margin: 0;
+  border-radius: 8px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.rating-track-copy {
+  height: 104px;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+.rating-track-copy .track-artists {
+  margin-bottom: 0;
+}
+.rating .track-title {
+  margin-top: 4px;
+}
+.rating-loading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.rating-loading-emblem {
+  position: relative;
+  width: 108px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+.rating-loading-emblem::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid #d8ee6926;
+  border-top-color: #d8ee69;
+  border-radius: 50%;
+  animation: rating-loading-spin 1s linear infinite;
+}
+.rating-loading-emblem .wordmark {
+  font-size: 27px;
+}
+@keyframes rating-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rating-loading-emblem::before {
+    animation: none;
+  }
+}
+.rating-stage-message {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  background: #19191d;
+  border: 1px solid #38383e;
+  border-radius: 12px;
+  overflow-y: auto;
+}
+.rating-stage-message h1 {
+  font-size: clamp(28px, 7vw, 42px);
+  margin: 0 0 12px;
+}
+.rating-stage-message p {
+  font-size: 14px;
+  margin: 4px 0 16px;
+}
+.swipe-hint {
+  position: relative;
+  text-align: center;
+  font-size: 12px;
+  color: #b4b4bd;
+  min-height: 38px;
+  margin: 12px 0;
+}
+.swipe-hint:has(.swipe-feedback[data-intent="PASS"]) .swipe-instruction,
+.swipe-hint:has(.swipe-feedback[data-intent="LIKE"]) .swipe-instruction,
+.swipe-hint:has(.swipe-feedback[data-intent="SUPER_LIKE"]) .swipe-instruction {
+  visibility: hidden;
+}
+.rating-recovery {
+  min-height: 0;
+}
+.rating-recovery .primary {
+  margin: 0;
+  justify-content: center;
+}
+.swipe-card[data-exit="PASS"] {
+  animation: card-pass 220ms ease-in forwards;
+}
+.swipe-card[data-exit="LIKE"] {
+  animation: card-like 220ms ease-in forwards;
+}
+.swipe-card[data-exit="SUPER_LIKE"] {
+  animation: card-super 220ms ease-in forwards;
+}
+.swipe-card[data-entering="true"]:not([data-dragging="true"]):not(
+    [data-exit="PASS"]
+  ):not([data-exit="LIKE"]):not([data-exit="SUPER_LIKE"]) {
+  animation: card-enter 180ms ease-out;
+}
+@keyframes card-pass {
+  from {
+    transform: translate(var(--drag-x), var(--drag-y))
+      rotate(var(--drag-rotation));
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc(-100vw - 100%), var(--drag-y)) rotate(-7deg);
+    opacity: 0;
+  }
+}
+@keyframes card-like {
+  from {
+    transform: translate(var(--drag-x), var(--drag-y))
+      rotate(var(--drag-rotation));
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc(100vw + 100%), var(--drag-y)) rotate(7deg);
+    opacity: 0;
+  }
+}
+@keyframes card-super {
+  from {
+    transform: translate(var(--drag-x), var(--drag-y))
+      rotate(var(--drag-rotation));
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--drag-x), calc(-100vh - 100%));
+    opacity: 0;
+  }
+}
+@keyframes card-enter {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .swipe-card {
+    transform: none;
+    transition: none;
+    animation: none !important;
+  }
+}
+/* Fit the voting controls together on phones; overflow remains available for zoom/error recovery. */
+@media (max-width: 600px) {
+  .app:has(.rating) {
+    --rating-bottom-space: max(16px, env(safe-area-inset-bottom, 0px));
+    min-height: 100dvh;
+    padding: 0 18px;
+  }
+  .app:has(.rating) > header {
+    height: 56px;
+    flex: 0 0 56px;
+  }
+  main:has(> .rating) {
+    display: flex;
+    padding: 8px 0 var(--rating-bottom-space);
+  }
+  .rating {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .rating > * {
+    flex-shrink: 0;
+  }
+  .app:has(.rating) > footer {
+    display: none;
+  }
+  .rating-context {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .rating-progress {
+    min-height: 20px;
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 20px;
+  }
+  .rating-stage {
+    max-width: none;
+    width: min(
+      100%,
+      max(160px, calc(100svh - 374px - var(--rating-bottom-space)))
+    );
+    width: min(
+      100%,
+      max(160px, calc(100dvh - 374px - var(--rating-bottom-space)))
+    );
+    /* Share surplus height around the artwork, keeping the controls near the bottom. */
+    margin-block: auto;
+  }
+  .rating .swipe-card .placeholder {
+    font-size: 32px;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .rating-track-copy {
+    height: 64px;
+    margin-top: 8px;
+  }
+  .rating .track-title {
+    font-size: 26px;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+    margin: 0 0 4px;
+  }
+  .rating-track-copy .track-artists {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .rating .music-links {
+    margin: 8px 0;
+  }
+  .rating .music-caption {
+    font-size: 11px;
+    line-height: 16px;
+    margin-bottom: 4px;
+  }
+  .rating .music-link,
+  .rating .music-unavailable {
+    height: 48px;
+  }
+  .rating .music-actions {
+    gap: 8px;
+  }
+  .vote-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .vote-actions button {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+  .swipe-hint {
+    min-height: 0;
+    font-size: 11px;
+    line-height: 18px;
+    margin: 6px 0 0;
   }
 }

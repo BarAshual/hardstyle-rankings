@@ -26,7 +26,9 @@ import {
   type Invitation,
 } from "./api";
 
-import { Rating } from "./Rating";
+const Rating = lazy(() =>
+  import("./Rating").then((module) => ({ default: module.Rating })),
+);
 const MyPicks = lazy(() =>
   import("./MyPicks").then((module) => ({ default: module.MyPicks })),
 );
@@ -397,13 +399,77 @@ function SeasonHome() {
         <span aria-hidden="true" />
         {status}
       </p>
+      <nav className="home-actions" aria-label="Season actions">
+        <Link
+          className="home-action home-action-rating"
+          to={`/seasons/${seasonId}/rate`}
+          aria-labelledby="home-rating-label"
+          aria-describedby="home-rating-help"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4" />
+          </svg>
+          <span className="home-action-copy">
+            <strong id="home-rating-label">
+              {season.state === "VOTING" ? "Rate tracks" : "Rating status"}
+            </strong>
+            <span id="home-rating-help" className="home-action-help">
+              {season.state === "VOTING"
+                ? progress.unrated
+                  ? `${progress.unrated} ${progress.unrated === 1 ? "track" : "tracks"} left`
+                  : "You’re caught up"
+                : season.state === "SETUP"
+                  ? "Voting hasn’t opened"
+                  : "Voting is closed"}
+            </span>
+          </span>
+        </Link>
+        <Link
+          className="home-action"
+          to={`/seasons/${seasonId}/my-picks`}
+          aria-labelledby="home-picks-label"
+          aria-describedby="home-picks-help"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M3 5h10M3 10h8M3 15h8M17 18V7l4-1v4l-4 1" />
+            <circle cx="15" cy="18" r="2" />
+          </svg>
+          <span className="home-action-copy">
+            <strong id="home-picks-label">My Picks</strong>
+            <span id="home-picks-help" className="home-action-help">
+              {season.state === "VOTING"
+                ? "View & edit votes"
+                : "View your votes"}
+            </span>
+          </span>
+        </Link>
+      </nav>
       <div className="progress-card">
-        <p className="eyebrow">Your year in tracks</p>
-        <p className="track-total">
-          <strong>{progress.rated}</strong>
-          <span> / {progress.active_tracks}</span>
-        </p>
-        <p>tracks rated</p>
+        <p className="eyebrow">Your progress</p>
+        <div className="home-progress-summary">
+          <p className="track-total">
+            <strong>{progress.rated}</strong>
+            <span> / {progress.active_tracks}</span>
+          </p>
+          <p>tracks rated</p>
+        </div>
         <progress
           aria-label="Tracks rated"
           value={progress.rated}
@@ -426,19 +492,6 @@ function SeasonHome() {
       <p className="footnote">
         Your votes are yours. The group’s preferences stay private until reveal.
       </p>
-      <Link className="button" to={`/seasons/${seasonId}/my-picks`}>
-        My Picks
-      </Link>
-      {
-        <Link className="button primary" to={`/seasons/${seasonId}/rate`}>
-          {season.state === "VOTING"
-            ? progress.rated
-              ? "Continue rating"
-              : "Start rating"
-            : "View rating status"}{" "}
-          →
-        </Link>
-      }
     </section>
   );
 }
@@ -497,7 +550,9 @@ function Shell() {
             path="/seasons/:seasonId/rate"
             element={
               <RequireAuth>
-                <Rating />
+                <Suspense fallback={<Loading />}>
+                  <Rating />
+                </Suspense>
               </RequireAuth>
             }
           />

@@ -134,7 +134,11 @@ it("reads every page of own picks with ordered credits and a stable cursor", asy
     },
   });
   let page = 0;
-  const pages = [Array.from({ length: 500 }, (_, i) => row(i)), [row(500)]];
+  const pages = [
+    Array.from({ length: 500 }, (_, i) => row(i)),
+    Array.from({ length: 500 }, (_, i) => row(i + 500)),
+    [row(1000)],
+  ];
   const query = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
@@ -153,8 +157,10 @@ it("reads every page of own picks with ordered credits and a stable cursor", asy
   expect(query.eq).toHaveBeenCalledWith("season_id", "season");
   expect(query.eq).toHaveBeenCalledWith("user_id", "actor");
   expect(query.gt).toHaveBeenCalledWith("track_id", "track-499");
-  expect(result).toHaveLength(501);
-  expect(result[500]).toMatchObject({
+  expect(query.gt).toHaveBeenCalledWith("track_id", "track-999");
+  expect(query.limit).toHaveBeenCalledWith(500);
+  expect(result).toHaveLength(1001);
+  expect(result[1000]).toMatchObject({
     version: 4,
     artists: ["First", "Second"],
   });

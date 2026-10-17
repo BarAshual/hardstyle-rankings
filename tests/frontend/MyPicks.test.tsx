@@ -124,6 +124,16 @@ async function loaded() {
   await screen.findByRole("article", { name: "Neon Skyline" });
 }
 
+function manyPicks(count = 1001): Pick[] {
+  return Array.from({ length: count }, (_, n) => ({
+    ...tracks[0],
+    id: `30000000-0000-0000-0000-${String(n + 1).padStart(12, "0")}`,
+    title: `Track ${n + 1}`,
+    artists: [n === count - 1 ? "Tail Artist" : `Artist ${n + 1}`],
+    choice: n === count - 1 ? "SUPER_LIKE" : "LIKE",
+  }));
+}
+
 describe("My Picks", () => {
   it("loads own choices and supports title/artist search and all filters", async () => {
     const { api } = fake();
@@ -143,21 +153,15 @@ describe("My Picks", () => {
     expect(screen.getAllByRole("article")).toHaveLength(1);
     await userEvent.clear(search);
     for (const [filter, title] of [
-      ["LIKE", "Neon Skyline"],
-      ["PASS", "Hidden Frequency"],
-      ["SUPER_LIKE", "Final Echo"],
+      ["Likes", "Neon Skyline"],
+      ["Passes", "Hidden Frequency"],
+      ["Super Likes", "Final Echo"],
     ]) {
-      await userEvent.selectOptions(
-        screen.getByLabelText("Filter choices"),
-        filter,
-      );
+      await userEvent.click(screen.getByRole("button", { name: filter }));
       expect(screen.getAllByRole("article")).toHaveLength(1);
       expect(screen.getByRole("article", { name: title })).toBeInTheDocument();
     }
-    await userEvent.selectOptions(
-      screen.getByLabelText("Filter choices"),
-      "ALL",
-    );
+    await userEvent.click(screen.getByRole("button", { name: "All" }));
     expect(screen.getAllByRole("article")).toHaveLength(3);
     await userEvent.type(search, "missing");
     expect(screen.getByText(/No choices match/)).toBeInTheDocument();
@@ -196,7 +200,7 @@ describe("My Picks", () => {
       expect(f.picks[0].version).toBe(4);
       expect(
         screen.getByText(
-          `${to === "SUPER_LIKE" ? 1 : 2} Super Likes remaining`,
+          `${to === "SUPER_LIKE" ? "1 Super Like" : "2 Super Likes"} available`,
         ),
       ).toBeInTheDocument();
       expect(readPending(uid, sid)).toBeNull();
@@ -258,7 +262,7 @@ describe("My Picks", () => {
     view.unmount();
     mount(f.api);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await waitFor(() => expect(readPending(uid, sid)).toBeNull());
     await loaded();
@@ -281,7 +285,7 @@ describe("My Picks", () => {
     savePending({ action, track: tracks[0] });
     mount(f.api);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await waitFor(() => expect(readPending(uid, sid)).toBeNull());
     await loaded();
@@ -316,7 +320,12 @@ describe("My Picks", () => {
     fireEvent.click(pass);
     fireEvent.click(pass);
     expect(api.castVote).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Saving vote…" })).toBeDisabled();
+    expect(pass).toBeDisabled();
+    expect(readPending(uid, sid)).not.toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Try again" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Awaiting confirmation/)).not.toBeInTheDocument();
     await act(async () =>
       resolve({
         ...api.castVote.mock.calls[0][0],
@@ -324,6 +333,7 @@ describe("My Picks", () => {
         accepted_at: "now",
       }),
     );
+    expect(screen.queryByText("Vote saved.")).not.toBeInTheDocument();
   });
   it("handles locking mid-edit and still displays own picks", async () => {
     const f = fake();
@@ -354,7 +364,7 @@ describe("My Picks", () => {
     f.lock();
     mount(f.api);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await waitFor(() => expect(readPending(uid, sid)).toBeNull());
     await loaded();
@@ -363,7 +373,7 @@ describe("My Picks", () => {
     ).toBeInTheDocument();
     expect(choice("LIKE")).toBeDisabled();
   });
-  it("rating can recover an edit from the same pending journal", async () => {
+  it("recovers a pending edit through the direct Rating link and returns to My Picks", async () => {
     const f = fake();
     const action: VoteAction = {
       user_id: uid,
@@ -374,13 +384,22 @@ describe("My Picks", () => {
       action_id: crypto.randomUUID(),
     };
     savePending({ action, track: tracks[0] });
-    mount(f.api, `/seasons/${sid}/rate`);
+    mount(f.api);
+    await loaded();
+    await userEvent.click(screen.getByRole("link", { name: "Rate tracks →" }));
+    await screen.findByRole("link", { name: "My Picks →" });
     await userEvent.click(
-      await screen.findByRole("button", { name: "Retry pending vote" }),
+      await screen.findByRole("button", { name: "Try again" }),
     );
     await screen.findByRole("heading", { name: "You’re caught up." });
     expect(f.picks[0].version).toBe(4);
     expect(readPending(uid, sid)).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "My Picks →" }));
+    await loaded();
+    expect(
+      card().getByText("PASS", { selector: "strong" }),
+    ).toBeInTheDocument();
+    expect(f.api.castVote).toHaveBeenCalledOnce();
   });
   it("preserves edits across reload and uses their new version for another edit", async () => {
     const f = fake();
@@ -415,4 +434,163 @@ describe("My Picks", () => {
       spy.mockRestore();
     }
   });
+  it("keeps loaded cards mounted during return refresh and coalesces focus/visibility events", async () => {
+    const f = fake();
+    mount(f.api);
+    await loaded();
+    const original = screen.getByRole("article", { name: "Neon Skyline" });
+    let resolve!: (picks: Pick[]) => void;
+    f.api.myPicks.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("visible");
+    try {
+      fireEvent.focus(window);
+      fireEvent(document, new Event("visibilitychange"));
+      await waitFor(() => expect(f.api.myPicks).toHaveBeenCalledTimes(2));
+      expect(screen.getByRole("article", { name: "Neon Skyline" })).toBe(
+        original,
+      );
+      expect(
+        screen.queryByText("Loading your latest choices…"),
+      ).not.toBeInTheDocument();
+      expect(choice("PASS")).toBeDisabled();
+      fireEvent.click(choice("PASS"));
+      expect(f.api.castVote).not.toHaveBeenCalled();
+      f.replace([
+        { ...tracks[0], choice: "PASS", version: 4 },
+        ...tracks.slice(1),
+      ]);
+      await act(async () => resolve(structuredClone(f.picks)));
+      await waitFor(() => expect(choice("LIKE")).toBeEnabled());
+      expect(choice("PASS")).toBeDisabled();
+      expect(screen.getByRole("article", { name: "Neon Skyline" })).toBe(
+        original,
+      );
+    } finally {
+      visibility.mockRestore();
+    }
+  });
+  it("retains visible picks after a failed refresh and blocks stale edits until a successful retry", async () => {
+    const f = fake();
+    mount(f.api);
+    await loaded();
+    const original = screen.getByRole("article", { name: "Neon Skyline" });
+    f.api.myPicks.mockRejectedValueOnce(new Error("offline"));
+    fireEvent.focus(window);
+    await screen.findByText(/couldn’t refresh your picks/);
+    expect(screen.getByRole("article", { name: "Neon Skyline" })).toBe(
+      original,
+    );
+    expect(choice("PASS")).toBeDisabled();
+    fireEvent.click(choice("PASS"));
+    expect(f.api.castVote).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Refresh picks" }),
+    );
+    await waitFor(() => expect(choice("PASS")).toBeEnabled());
+    expect(
+      screen.queryByText(/couldn’t refresh your picks/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Neon Skyline" })).toBe(
+      original,
+    );
+  });
+  it("paginates 1001 choices in groups of 25 and searches/filters beyond the displayed page", async () => {
+    const f = fake(manyPicks());
+    mount(f.api);
+    await screen.findByRole("article", { name: "Track 1" });
+    expect(screen.getAllByRole("article")).toHaveLength(25);
+    expect(screen.getByText("Showing 1–25 of 1001 picks")).toBeInTheDocument();
+    const top = within(
+      screen.getByRole("navigation", { name: "My Picks pages (top)" }),
+    );
+    expect(top.getByRole("button", { name: "← Previous" })).toBeDisabled();
+    await userEvent.click(top.getByRole("button", { name: "Next →" }));
+    await screen.findByRole("article", { name: "Track 26" });
+    expect(
+      screen.queryByRole("article", { name: "Track 1" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 26–50 of 1001 picks")).toHaveFocus();
+    const search = screen.getByRole("searchbox", {
+      name: "Search title or artist",
+    });
+    await userEvent.type(search, "Tail Artist");
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(
+      screen.getByRole("article", { name: "Track 1001" }),
+    ).toBeInTheDocument();
+    await userEvent.clear(search);
+    await userEvent.click(screen.getByRole("button", { name: "Super Likes" }));
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(
+      screen.getByRole("article", { name: "Track 1001" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "My Picks pages (top)" }),
+    ).not.toBeInTheDocument();
+    expect(f.api.myPicks).toHaveBeenCalledOnce();
+  });
+  it("restores page/search/filter from the URL and keeps the last page during a return refresh", async () => {
+    const f = fake(manyPicks());
+    const view = mount(f.api, `/seasons/${sid}/my-picks?page=41`);
+    await screen.findByRole("article", { name: "Track 1001" });
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getAllByText("Page 41 of 41")).toHaveLength(2);
+    const original = screen.getByRole("article", { name: "Track 1001" });
+    fireEvent.focus(window);
+    await waitFor(() => expect(f.api.myPicks).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("article", { name: "Track 1001" })).toBe(original);
+    expect(screen.getAllByText("Page 41 of 41")).toHaveLength(2);
+    view.unmount();
+    mount(f.api, `/seasons/${sid}/my-picks?q=Tail&choice=SUPER_LIKE&page=41`);
+    await screen.findByRole("article", { name: "Track 1001" });
+    expect(
+      screen.getByRole("searchbox", { name: "Search title or artist" }),
+    ).toHaveValue("Tail");
+    expect(screen.getByRole("button", { name: "Super Likes" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText("Showing 1–1 of 1 picks")).toBeInTheDocument();
+  });
+  it("clamps the page after an edit removes the last filtered result without sending another vote", async () => {
+    const f = fake(
+      manyPicks(26).map((p) => ({ ...p, choice: "LIKE" as Choice })),
+    );
+    mount(f.api, `/seasons/${sid}/my-picks?choice=LIKE&page=2`);
+    const last = within(
+      await screen.findByRole("article", { name: "Track 26" }),
+    );
+    await userEvent.click(last.getByRole("button", { name: "SUPER LIKE" }));
+    await screen.findByRole("article", { name: "Track 1" });
+    expect(screen.getAllByRole("article")).toHaveLength(25);
+    expect(
+      screen.queryByRole("article", { name: "Track 26" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 1–25 of 25 picks")).toBeInTheDocument();
+    expect(f.api.castVote).toHaveBeenCalledOnce();
+    expect(f.api.castVote.mock.calls[0][0].expected_version).toBe(3);
+    expect(f.picks[25].choice).toBe("SUPER_LIKE");
+    expect(f.picks[25].version).toBe(4);
+  });
+  it.each(["-1", "invalid", "1.5", "9999"])(
+    "handles page=%s without showing an empty page",
+    async (value) => {
+      const f = fake(manyPicks());
+      mount(f.api, `/seasons/${sid}/my-picks?page=${value}`);
+      await screen.findByRole("article", {
+        name: value === "9999" ? "Track 1001" : "Track 1",
+      });
+      expect(screen.getAllByRole("article")).toHaveLength(
+        value === "9999" ? 1 : 25,
+      );
+      expect(f.api.castVote).not.toHaveBeenCalled();
+    },
+  );
 });

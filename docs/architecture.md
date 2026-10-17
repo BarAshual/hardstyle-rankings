@@ -79,3 +79,7 @@ Future withdrawal preserves canonical identity, season membership, votes, and ev
 ## First importer implementation (2026-10-07)
 
 The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.
+
+## Mobile rating presentation (2026-10-11)
+
+Unrated Rating gestures and buttons share the unchanged pending-action journal, receipt validator, and cast_vote path. Gesture cancellation stops at submission. A confirmed receipt permits a directional card exit; existing authoritative home/next-track reads determine progress, allowance and the next eligible track. The mounted layout holds a stable card slot during reads and offers read-only retry after a confirmed vote. No speculative/background queue, local authority counters, additional RPC, database permission, Auth, or secrecy change is introduced. My Picks shares local official provider-link artwork but has no swipe editing. Calibration and browser-versus-device verification are recorded in [frontend.md](frontend.md).

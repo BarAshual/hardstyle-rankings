@@ -152,3 +152,21 @@ The first bounded local Spotify importer is implemented by `20261007000100_catal
 The owner selected Vercel Hobby and Supabase Cloud Free, with no paid upgrades or domain purchase for now. The requested frontend name is tiloz-ranking-2k26; its vercel.app domain remains subject to assignment. Production starts clean: local votes are experiments and are not transferred. Repeated hosted tests and a 2–3 user pilot use separate dummy seasons. The first dummy season allowance is 50; the official allowance remains open.
 
 A dummy season does not isolate shared schema/catalog changes or database restore. Destructive rehearsals require a separate disposable target once official data exists. Backup frequency, acceptable recovery loss/downtime, independent storage and scheduling remain open; tested recovery is required before official voting. See [deployment.md](deployment.md) for the runbook and unverified rollout status. Existing vote integrity, owner trust boundary and pre-REVEAL secrecy are unchanged.
+
+## Mobile rating implementation details (2026-10-11)
+
+The authorized pilot UX brief implements the existing left/PASS, right/LIKE, up/SUPER_LIKE mapping for unrated Rating cards only. Branded external links are shared with My Picks and use official locally stored assets. Submission/recovery/versioning/privacy rules are unchanged; cancellation is permitted only before submission and uncertain outcomes retain the original action. Card departure follows accepted receipt validation, and next-track failure retries existing reads only.
+
+In a subsequent authorized visual revision, the owner accepted compact single-row icon/service-name buttons in place of the original full Apple Listen on badge and Spotify full-logo presentation. The official provider icons remain unchanged local artwork; a shared Listen on caption and the existing accessible link names identify the action. Red/green button colors, equal dimensions and a group aligned to the content column are presentation details, with no catalog, playback or voting contract change.
+
+Activation (12 CSS px), directional dominance (1.35×), clamped quarter-surface thresholds, ±7° horizontal rotation, and 210/220/180 ms return/exit/entry timings are engineering calibration values documented in [frontend.md](frontend.md), not historical product decisions or physically validated thresholds. Browser simulations passed; physical Safari/iOS and Chrome/Android testing remains a pilot gate. This entry preserves earlier decisions and adds no results, Undo, music playback/OAuth, queue, or backend contract.
+
+
+## Accepted compact rating and scroll fallback (2026-10-11)
+
+Following the owner's phone screenshot and approval to continue, mobile Rating prioritizes a single visible screen containing the artwork, track details, listening links and all three vote buttons. Left/PASS, right/LIKE and up/SUPER_LIKE remain the mapping when the page fits. If the visible viewport cannot contain the page, native vertical scrolling takes priority and Super Like uses its explicit button. Vertical gestures yielded to scrolling never become votes through later sideways drift; viewport mode changes cancel an active gesture before submission. This is an accepted interaction adjustment to prevent accidental votes, with no change to stored choices, allowances, durable action identity, privacy or the official season. Calibration and physical-device limitations are documented in [frontend.md](frontend.md).
+
+
+## Accepted borderless artwork and vote order (2026-10-11)
+
+The owner approved removing the visible artwork frame and permanent drag caption, and ordering vote controls as PASS left, SUPER LIKE center and LIKE right. Artwork fills its existing square drag surface without outer padding. Gesture and saving/receipt feedback use the existing instruction row below the controls, outside the album image, without reserving a separate frame band. This supersedes the original visual frame treatment while preserving gesture mapping, scrolling safety and all voting/privacy contracts. See [frontend.md](frontend.md) for implementation and verification.
