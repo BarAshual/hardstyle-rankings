@@ -1,8 +1,6 @@
 import type { Track } from "./api";
-import appleColorIcon from "./assets/apple-music-icon-color.svg";
-import spotifyGreenIcon from "./assets/spotify-icon-green.svg";
-import appleWhiteIcon from "./assets/apple-music-icon-white.svg";
-import spotifyBlackIcon from "./assets/spotify-icon-black.svg";
+import appleIcon from "./assets/apple-music-icon-white.svg";
+import spotifyIcon from "./assets/spotify-icon-black.svg";
 
 export function musicURL(
   value: string | null,
@@ -20,20 +18,11 @@ export function musicURL(
   }
 }
 
-export function MusicLinks({
-  track,
-  appearance = "branded",
-}: {
-  track: Track | null;
-  appearance?: "branded" | "subtle";
-}) {
+export function MusicLinks({ track }: { track: Track | null }) {
   const apple = musicURL(track?.apple_music_url ?? null, "apple");
   const spotify = musicURL(track?.spotify_url ?? null, "spotify");
   return (
-    <div
-      className={`music-links music-links-${appearance}`}
-      aria-label="Listen to this track"
-    >
+    <div className="music-links" aria-label="Listen to this track">
       <p className="music-caption">Listen on</p>
       <div className="music-actions">
         {apple ? (
@@ -44,10 +33,7 @@ export function MusicLinks({
             rel="noopener noreferrer"
             aria-label="Listen on Apple Music (opens in a new tab)"
           >
-            <img
-              src={appearance === "subtle" ? appleColorIcon : appleWhiteIcon}
-              alt=""
-            />
+            <img src={appleIcon} alt="" />
             <span>Apple Music</span>
           </a>
         ) : (
@@ -61,12 +47,7 @@ export function MusicLinks({
             rel="noopener noreferrer"
             aria-label="Listen on Spotify (opens in a new tab)"
           >
-            <img
-              src={
-                appearance === "subtle" ? spotifyGreenIcon : spotifyBlackIcon
-              }
-              alt=""
-            />
+            <img src={spotifyIcon} alt="" />
             <span>Spotify</span>
           </a>
         ) : (

@@ -6,8 +6,6 @@ This is a testable Preview release, not approval to start official voting. No pr
 
 **Post-acceptance UI follow-up:** routine pending/saving/success messages have since been removed from Rating and My Picks at the owner's request. Error/recovery feedback remains. This revision needs a fresh phone check; the earlier acceptance does not automatically cover it. See [error-only feedback](#error-only-voting-feedback-2026-10-15).
 
-**Latest appearance follow-up (scope clarified):** subdued listening buttons and red/green/primary-lime selected choices apply only to My Picks, with fixed ✕ / ↑ / ✓ icons. Rating has its original appearance restored, including filled red/green listening buttons. See [button hierarchy](#vote-and-listening-button-hierarchy-2026-10-15); physical-phone acceptance of the latest revision remains pending.
-
 ## Release and environment
 
 - Initial UI commit: `a74f99692ed8063cde005e3116fd10397c100abb` on `preview/mobile-pilot-readiness`.
@@ -163,11 +161,3 @@ The routine pending panel opened immediately after journaling every vote, change
 All **126 frontend tests**, typecheck, lint and build passed. Actual-component fictional-data browser checks used ten-second requests: 390×850 Rating had identical artwork/action bounds before/during/after a swipe; 320×568 also held its bounds during a swipe, with neither normal viewport overflowing. My Picks kept its document height and card positions through a slow edit and authoritative refresh. Lost-response recovery succeeded on both screens, with no success notice; Rating's recovery controls also stayed steady during replay. Exact-action/duplicate/storage/quota/closed-state regressions still pass. These checks do not mutate Cloud votes or replace native-phone acceptance.
 
 Phone review for this follow-up: refresh the same Preview, swipe through choices and edit an existing My Picks choice; neither action should insert routine status text or shift controls. Check an offline/unconfirmed action still offers a clear recovery path. No new Cloud votes, production deployment or official-season change is part of agent verification.
-
-## Vote and listening-button hierarchy (2026-10-15)
-
-The owner clarified that the new design applies only to My Picks: neutral listening controls with official colored icons, plus red PASS, green LIKE and primary lime SUPER LIKE. Only its current choice is filled; ✕ / ↑ / ✓ stay fixed without an extra selection check. The adjacent current-choice text, aria-pressed state and keyboard/button alternatives remain available. Rating is restored to the `c60ac5c` appearance: neutral ← PASS, outlined ↑ SUPER LIKE, primary-filled LIKE → and filled red/green listening buttons. An explicit MusicLinks appearance variant and scoped My Picks selectors separate the two presentations. Both retain existing link protections, and routine saving/success remain silent on both screens.
-
-Phone review: refresh the same Preview, confirm Rating looks as it did before the hierarchy revision, and inspect PASS / SUPER LIKE / LIKE selections in My Picks under All. Verify the selected control is obvious and its icon stays fixed after editing. Earlier manual acceptance remains historical; this visual revision needs a fresh phone check. No production or official-season change is included.
-
-After the scope correction, all **126 frontend tests**, typecheck, ESLint and build passed. Rating.tsx and its existing behavioral tests match `c60ac5c` exactly. Actual-component fictional-data browser checks at 320×568, 390×850, 430×932 and 1280×900 confirmed the original Rating colors/arrows/4 px corners, 48 px mobile controls and no normal-phone page overflow. My Picks retained dark 44 px provider controls, all three selected fills and fixed icons. Neither screen had horizontal overflow or runtime errors. No Cloud votes were written. The existing error-only feedback/recovery regressions still pass; native phone appearance needs a refresh/review.

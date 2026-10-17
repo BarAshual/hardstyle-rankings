@@ -499,33 +499,13 @@ footer {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
-.rating .vote-actions .super {
+.vote-actions .super {
   border-color: #d8ee69;
   color: #d8ee69;
 }
-.rating .vote-actions .like {
+.vote-actions .like {
   background: #d8ee69;
   color: #14160c;
-}
-.picks {
-  --vote-pass: #f0808c;
-  --vote-like: #71c79a;
-  --vote-super: #d8ee69;
-}
-.pick-actions [data-choice="PASS"],
-.pick-choice [data-choice="PASS"] {
-  --choice-color: var(--vote-pass);
-}
-.pick-actions [data-choice="LIKE"],
-.pick-choice [data-choice="LIKE"] {
-  --choice-color: var(--vote-like);
-}
-.pick-actions [data-choice="SUPER_LIKE"],
-.pick-choice [data-choice="SUPER_LIKE"] {
-  --choice-color: var(--vote-super);
-}
-.pick-actions button:hover:not(:disabled) {
-  box-shadow: inset 0 0 0 1px var(--choice-color);
 }
 
 @media (max-width: 480px) {
@@ -740,7 +720,10 @@ select:focus-visible {
   gap: 4px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--choice-color);
+  color: #d8ee69;
+}
+.pick-choice strong[data-choice="PASS"] {
+  color: #b4b4bd;
 }
 .pick-controls {
   grid-column: 1 / -1;
@@ -778,14 +761,20 @@ select:focus-visible {
   line-height: 1.25;
   font-weight: 500;
 }
-.picks .pick-actions button[aria-pressed="true"] {
-  border-color: var(--choice-color);
-  box-shadow: inset 0 0 0 1px var(--choice-color);
-  background: var(--choice-color);
+.pick-actions button[data-choice="SUPER_LIKE"] {
+  color: #d8ee69;
+}
+.pick-actions button[aria-pressed="true"] {
+  border-color: #d8ee69;
+  background: #d8ee69;
   color: #14160c;
-  font-weight: 600;
   opacity: 1;
   cursor: default;
+}
+.pick-actions button[data-choice="PASS"][aria-pressed="true"] {
+  border-color: #b4b4bd;
+  background: #242428;
+  color: #f3f0e8;
 }
 .picks-privacy {
   margin: 20px 0 0;
@@ -857,22 +846,13 @@ select:focus-visible {
   flex: 0 0 24px;
   object-fit: contain;
 }
-.music-links-branded .apple-link {
+.apple-link {
   background: #e71935;
   color: #fff;
 }
-.music-links-branded .spotify-link {
+.spotify-link {
   background: #1ed760;
   color: #000;
-}
-.music-links-subtle .music-link {
-  border-color: #38383e;
-  background: #19191d;
-  color: #f3f0e8;
-}
-.music-links-subtle .music-link:hover {
-  border-color: #777780;
-  background: #242428;
 }
 .music-unavailable {
   border: 1px dashed #55555a;

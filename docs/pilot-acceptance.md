@@ -24,8 +24,6 @@ These are owner-reported real-phone results, not a new agent-run phone or databa
 
 After this acceptance, the owner and a participant reported that routine pending/success notices caused layout jumps. The owner requested error-only vote feedback in Rating and My Picks. That follow-up is recorded in [pilot-preview.md](pilot-preview.md#error-only-voting-feedback-2026-10-15) with its automated/browser evidence. The manual passes above remain historical evidence for UI commit `426048e`; they do not imply a new physical-phone acceptance of the later feedback change. Refresh/recheck the Preview on a phone before closing that revision.
 
-The owner subsequently approved a [button hierarchy revision](pilot-preview.md#vote-and-listening-button-hierarchy-2026-10-15), then clarified that it applies only to My Picks: subdued listening controls, red/green/primary-lime choices and fixed icons with only the current choice filled. Rating's pre-hierarchy appearance is restored; error-only vote feedback remains on both screens. Its browser/automated checks are separate from the earlier reported phone passes; new phone acceptance is still required for this appearance.
-
 ## Supporting automated and server evidence
 
 - [Quality gate for the UI implementation](https://github.com/BarAshual/hardstyle-rankings/actions/runs/38738106795) passed: 126 frontend tests, TypeScript, ESLint, build and whitespace checks, plus the disposable database rebuild/lint, database/API and importer checks.
