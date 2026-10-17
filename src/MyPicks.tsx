@@ -22,7 +22,7 @@ import {
 
 const choices: Choice[] = ["PASS", "SUPER_LIKE", "LIKE"];
 const labels = { PASS: "PASS", LIKE: "LIKE", SUPER_LIKE: "SUPER LIKE" };
-const symbols = { PASS: "←", SUPER_LIKE: "↑", LIKE: "→" };
+const symbols = { PASS: "✕", SUPER_LIKE: "↑", LIKE: "✓" };
 const filters = [
   { value: "ALL", label: "All" },
   { value: "LIKE", label: "Likes" },
@@ -434,11 +434,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                             <span className="sr-only">Current choice: </span>
                             <strong data-choice={p.choice}>
                               <span aria-hidden="true">
-                                {p.choice === "LIKE"
-                                  ? "✓"
-                                  : p.choice === "SUPER_LIKE"
-                                    ? "↑"
-                                    : "−"}
+                                {symbols[p.choice]}
                               </span>
                               {labels[p.choice]}
                             </strong>
@@ -451,7 +447,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                           )}
                         </div>
                         <div className="pick-controls">
-                          <MusicLinks track={p} />
+                          <MusicLinks track={p} appearance="subtle" />
                           <div
                             className="vote-actions pick-actions"
                             aria-label={`Edit ${p.title}`}
@@ -472,9 +468,7 @@ function PicksSession({ seasonId }: { seasonId: string }) {
                                 }
                                 onClick={() => void edit(p, c)}
                               >
-                                <span aria-hidden="true">
-                                  {p.choice === c ? "✓" : symbols[c]}
-                                </span>
+                                <span aria-hidden="true">{symbols[c]}</span>
                                 {labels[c]}
                               </button>
                             ))}
