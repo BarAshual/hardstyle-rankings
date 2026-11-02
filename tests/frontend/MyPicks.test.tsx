@@ -55,6 +55,9 @@ function fake(initial = tracks) {
   let state: Home["season"]["state"] = "VOTING";
   const receipts = new Map<string, VoteReceipt>();
   const api = {
+    adminSeason: vi.fn(),
+    setLoveVisibility: vi.fn(),
+    transitionSeason: vi.fn(),
     restore: vi.fn().mockResolvedValue({ id: uid }),
     subscribe: vi.fn(() => () => {}),
     signIn: vi.fn(),
@@ -65,6 +68,7 @@ function fake(initial = tracks) {
     accept: vi.fn(),
     nextTrack: vi.fn().mockResolvedValue(null),
     home: vi.fn(async (): Promise<Home> => ({
+      role: "member",
       season: { id: sid, name: "Test season", year: 2026, state },
       nickname: "Duke",
       progress: {

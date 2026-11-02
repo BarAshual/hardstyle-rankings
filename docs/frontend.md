@@ -2,9 +2,9 @@
 
 ## Stack and scope
 
-Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. The first voting UI is described below. There is no admin dashboard, result calculation, email delivery, or music-provider integration.
+Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. The first voting UI is described below. The [bounded season admin panel](season-admin-panel.md) provides lifecycle and love-similarity visibility controls. There is no results screen, invitation delivery or music-provider integration in this panel.
 
-The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, `/seasons/:seasonId/rate`, and `/seasons/:seasonId/my-picks`. BrowserRouter requires a production host to serve index.html for these paths; the tracked vercel.json supplies this fallback on Vercel. See [deployment.md](deployment.md) for the accepted free-tier rollout and exact production configuration. The dev server already provides that fallback.
+The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, `/seasons/:seasonId/rate`, `/seasons/:seasonId/my-picks`, and `/seasons/:seasonId/admin`. BrowserRouter requires a production host to serve index.html for these paths; the tracked vercel.json supplies this fallback on Vercel. See [deployment.md](deployment.md) for the accepted free-tier rollout and exact production configuration. The dev server already provides that fallback.
 
 ## Run locally
 
@@ -65,7 +65,7 @@ PKCE uses the browser that initiated sign-in. The app explicitly exchanges the r
 
 ## Provisioning a real local test invitation
 
-No admin frontend is included. First sign in through the app using the season creator's real Google account. Seeing “Find your crew” at this point is expected: authentication alone does not create membership.
+The bounded admin panel does not create seasons or invitations. An in-platform season creation flow is requested future work; see [admin identity, interim assignment and the future flow](season-admin-panel.md#admin-identity-and-interim-database-assignment). First sign in through the app using the season creator's real Google account. Seeing “Find your crew” at this point is expected: authentication alone does not create membership.
 
 The project owner can then provision a season and invitation using the existing RPCs from the local database. This intentionally uses the accepted owner trust boundary. Substitute the two email placeholders before running; the creator must already exist from a real Google sign-in:
 
@@ -306,3 +306,10 @@ The owner and a pilot participant reported layout jumps from the routine pending
 Friendly failures and restored unconfirmed actions retain an error explanation and Try again. The explanation/button stay mounted while retrying, so recovery itself does not collapse and reopen the panel. The delayed branded next-track loader remains for genuinely slow reads. Earlier chronological entries describing routine saving/success labels are superseded by this section.
 
 All **126 frontend tests**, typecheck, ESLint and build passed. Extended deferred-request regressions verify that the journal exists, duplicate submissions remain blocked, routine retry/pending UI is absent, and success adds no notice. Actual-component browser checks with fictional data delayed requests by ten seconds: at 390×850, a swipe kept the 354 px artwork slot and 48 px action row at identical bounds before/during/after confirmation; at 320×568 the 178 px artwork slot and action row also stayed fixed during a swipe. Neither normal viewport gained overflow. My Picks retained its 1,212 px document height and card document positions through a slow edit and refresh. Simulated lost responses on both screens showed only the friendly error/retry path; replay advanced one Rating choice and updated one existing My Picks choice without a success notice. Rating's retry explanation/button bounds remained identical while replaying. These are browser mouse-drag and fixture checks, not a new native-phone acceptance. No Cloud votes were written or database contract changed.
+
+
+## Bounded season admin panel (2026-10-25)
+
+An admin-only Home entry opens `/seasons/:seasonId/admin`, reusing the season navigation, mobile spacing, dark cards and lime primary controls. Only the selected season's admins can load its operational metadata and controls. The [panel contract](season-admin-panel.md) documents one-step lifecycle confirmations, manual REVEAL-only visibility, durable visibility replay, read-only lifecycle recovery and account/season isolation. No results/preferences are queried.
+
+All **241 frontend tests**, typecheck, ESLint and build passed; 39 new panel tests and five new API-boundary tests cover authorization, state/receipt validation, failures/reloads, journals and isolation. A synthetic in-memory browser preview verified Home entry, close → reveal → explicit open → hide, confirmation focus, and the 320/390 px mobile layouts with no browser errors. This was not a real Google/Cloud test; database contracts were unchanged and their suite was not rerun for this UI-only slice. Existing prior server verification remains recorded in [wrapped-results-server.md](wrapped-results-server.md).

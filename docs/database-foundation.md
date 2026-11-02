@@ -2,7 +2,7 @@
 
 ## Status and boundaries
 
-Implemented source-data foundation using Supabase/Postgres 17. Scoring, results, email delivery, and reveal presentation remain deferred. The [first local Spotify importer](spotify-importer.md) is implemented separately, with bounded local live-provider verification recorded in its operating guide. The first frontend slice is documented in [frontend.md](frontend.md). The source migrations are authoritative for schema and function signatures. Accepted product/architecture decisions are in [decisions.md](decisions.md).
+Implemented source-data foundation using Supabase/Postgres 17. Song scoring, email delivery and reveal presentation remain deferred. The later [love-similarity server slice](wrapped-results-server.md) adds an explicitly gated summary path without changing foundation voting/RLS contracts. The [first local Spotify importer](spotify-importer.md) is implemented separately, with bounded local live-provider verification recorded in its operating guide. The first frontend slice is documented in [frontend.md](frontend.md). The source migrations are authoritative for schema and function signatures. Accepted product/architecture decisions are in [decisions.md](decisions.md).
 
 The implementation uses one season row lock to serialize writes for a season. This intentionally favors simple correctness over throughput for approximately 15 friends. No mutable Super Like usage counter, permanent completion flag, synchronization service, or result snapshot exists.
 
@@ -30,6 +30,7 @@ Python dependencies are pinned in `tests/requirements.txt`. A normal `.venv` is 
 
 | Migration | Contents |
 | --- | --- |
+| `20261025000100_love_similarity_results.sql` | Private hidden-by-default category setting, immutable visibility action ledger, admin read/change and guarded member pair-evidence RPCs. |
 | `20261007000100_catalog_import.sql` | Private provider identities, audited source configuration, plans/review decisions/item receipts, additive artwork curation flag, and authenticated season-admin import RPCs. |
 | `20261008000100_import_evidence.sql` | Additive retained ISRC evidence/backfill, optional baseline initialization, consistent indexed collision predicates, and material match/peer binding for importer reviews. |
 | `20261008000200_import_artist_evidence.sql` | Additive material artist-collision evidence and exact reviewed same-plan artist-peer validation; preserves mappings and history. |
@@ -48,6 +49,9 @@ RPC names and parameters below match SQL/PostgREST. Every caller's user ID comes
 
 | RPC | Contract |
 | --- | --- |
+| `get_love_similarity_visibility(p_season)` | Same-season admin operational metadata only; visibility, lifecycle and whether changes are allowed. |
+| `set_love_similarity_visibility(p_season, p_visible, p_action)` | Same-season admin, REVEAL only; audited and actor/action-idempotent visibility change. See [full contract](wrapped-results-server.md). |
+| `get_love_similarity_results(p_season)` | Same-season member, REVEAL and explicitly visible category only; named unordered pair evidence, no raw ballots/audit. |
 | `create_season(p_name, p_year, p_allowance, p_nickname)` | Verified Google identity creates a SETUP season and becomes its first admin atomically; returns season UUID. Explicit nonnegative allowance is required. |
 | `invite_member(p_season, p_email)` | Season admin creates an invitation with trimmed/lowercase email; returns its UUID. Repeating the same normalized season/email returns the existing invitation. No delivery occurs. |
 | `inspect_invitation(p_invitation)` | Verified invited Google identity only; returns season ID/name/year and own existing nickname or null, without creating membership. |
@@ -88,7 +92,7 @@ Expected errors include `authentication_required`, `verified_google_identity_req
 
 All application tables have RLS. `anon` has no table access or mutation RPC execution. `authenticated` has select access subject to RLS and an explicit list of RPC execute grants, with no INSERT/UPDATE/DELETE/TRUNCATE table privileges. There are no client mutation policies. Revocations name application-owned tables and functions explicitly; they do not sweep unrelated public objects or change schema-wide default privileges. Future application migrations must include explicit grants/revocations. Browser-supplied role/email fields cannot promote membership or change the actor.
 
-Members see their seasons/catalog metadata, their membership, their own current votes and audit events. Admins may also see their season's member list, invitations, and configuration/lifecycle history. They receive only completion counts through the narrowly scoped admin progress function. Every preference-bearing table remains restricted to its owner, in SETUP, VOTING, LOCKED, and REVEAL. No result query or implicit reveal grant exists. Aggregating RLS-filtered tables cannot reveal other members' preferences.
+Members see their seasons/catalog metadata, their membership, their own current votes and audit events. Admins may also see their season's member list, invitations, and configuration/lifecycle history. They receive only completion counts through the narrowly scoped admin progress function. Every preference-bearing table remains restricted to its owner, in SETUP, VOTING, LOCKED, and REVEAL. No implicit reveal grant exists. The later love-similarity RPC authorizes REVEAL and explicit category visibility before returning only pair evidence. Aggregating RLS-filtered tables cannot reveal other members' preferences.
 
 Security-definer functions pin an empty search path and fully qualify table/helper references. Private helpers are outside the exposed API schema; only boolean membership/admin helpers receive authenticated execute privileges for policies. Mutating functions recheck authority. Privileged owner/service access remains an explicit trust boundary; it is not an application admin role. Audit update/delete/truncate triggers add protection against accidental privileged rewrites, but the database owner can intentionally alter schema and bypass them.
 
@@ -129,3 +133,10 @@ My Picks introduces no new RPC or table grant. The client reads `votes`, explici
 ## First importer implementation (2026-10-07)
 
 The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.
+
+
+## Love similarity server follow-up (2026-10-25)
+
+The additive `20261025000100_love_similarity_results.sql` migration implements D49–D52 through private visibility storage/audit, an admin-only operational setting read/change contract, and a member-only REVEAL-plus-visibility pair-evidence RPC. See [the concrete contract and integration handoff](wrapped-results-server.md) for request/response shapes, locking, retries, JSON undefined values, and remaining UI work. Existing voting, progress, raw-vote/event grants and RLS are unchanged.
+
+A fresh isolated synthetic local project passed all **97 database/Data API tests** (17 new results tests), database lint, **197 TypeScript tests**, typecheck, lint and build. No real votes, existing database reset, production deployment or commit was involved.

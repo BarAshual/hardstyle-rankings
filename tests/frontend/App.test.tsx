@@ -9,6 +9,7 @@ const token = "10000000-0000-0000-0000-000000000001";
 const sid = "20000000-0000-0000-0000-000000000001";
 const user: Identity = { id: "user-1", email: "member@example.invalid" };
 const home: Home = {
+  role: "member",
   season: { id: sid, name: "Hardstyle 2026", year: 2026, state: "VOTING" },
   nickname: "Bar",
   progress: {
@@ -23,6 +24,9 @@ const home: Home = {
 function fake(identity: Identity | null = user) {
   let notify: (user: Identity | null) => void = () => {};
   const api = {
+    adminSeason: vi.fn(),
+    setLoveVisibility: vi.fn(),
+    transitionSeason: vi.fn(),
     restore: vi.fn().mockResolvedValue(identity),
     subscribe: vi.fn((callback: typeof notify) => {
       notify = callback;

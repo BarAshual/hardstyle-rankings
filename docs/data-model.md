@@ -46,7 +46,9 @@ Append-only `season_config_events` records allowance increases; `season_lifecycl
 
 Invitations compare trimmed, lowercase email without alias folding. Trusted Google identity data in auth.identities and a confirmed matching auth.users email are required; user-editable metadata is never trusted. Acceptance binds to auth.users.id. Expiry, revocation, resend, and account switching remain deferred.
 
-No result tables, persisted snapshots, scoring fields, aggregation APIs, or reveal-category configuration are included. Entering REVEAL does not broaden raw-vote access.
+The initial foundation included no results. The later [server slice](wrapped-results-server.md) adds private `season_result_categories` and append-only `season_result_category_events`, plus guarded summary RPCs. An absent category row is hidden. Only `love_similarity` is supported; events bind actor/action UUIDs to the requested season/visibility. There are no persisted scores or snapshots. Entering REVEAL broadens neither raw-vote access nor category visibility.
+
+[Love similarity v1](results-and-wrapped.md) is now an approved derived calculation, not a storage change. The [implemented isolated calculation](../src/domain/taste-similarity.ts) uses explicitly scoped current ballots and eligible track IDs in memory, rejects mismatched seasons and duplicate current choices, and returns comparison counts under `taste-love-v1`. Zero unions have undefined values with reasons; either undefined component leaves the combined score undefined. See the [implementation contract](taste-similarity-v1-implementation.md). The shared count helper now also consumes authorized per-pair evidence from the server slice; the JSON adapter preserves undefined values as null with reasons. The additive visibility migration stores no results and does not change vote/audit/RLS contracts or mutable counters.
 
 ## Ingestion additions
 

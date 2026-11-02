@@ -167,6 +167,86 @@ h2 {
   margin: 20px;
   text-underline-offset: 4px;
 }
+.admin-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 48px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid #38383e;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 14px;
+}
+.season-admin h1 {
+  font-size: clamp(44px, 8vw, 64px);
+  margin: 14px 0 20px;
+}
+.season-admin .season-navigation {
+  margin-bottom: 24px;
+}
+.admin-heading-row,
+.admin-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.admin-heading-row > p {
+  flex: 1 1 220px;
+  color: #b4b4bd;
+}
+.admin-card,
+.admin-confirm {
+  padding: clamp(18px, 4vw, 28px);
+  border: 1px solid #38383e;
+  background: #19191d;
+  border-radius: 5px;
+  margin-top: 20px;
+  overflow-wrap: anywhere;
+}
+.admin-confirm {
+  border-color: #d8ee69;
+}
+.admin-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+.admin-states li {
+  padding: 5px 8px;
+  color: #b4b4bd;
+  border: 1px solid #38383e;
+  border-radius: 3px;
+}
+.admin-states [aria-current="step"] {
+  color: #14160c;
+  background: #d8ee69;
+  border-color: #d8ee69;
+  font-weight: 700;
+}
+.admin-confirm-actions .primary {
+  flex: 1 1 180px;
+  width: auto;
+  margin: 0;
+  justify-content: center;
+}
+.season-admin button:disabled {
+  cursor: not-allowed;
+}
+@media (max-width: 600px) {
+  .app:has(.season-admin) > header {
+    height: 68px;
+  }
+  main:has(> .season-admin) {
+    padding: 24px 0 40px;
+  }
+}
 form {
   max-width: 440px;
   margin-top: 36px;

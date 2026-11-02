@@ -22,7 +22,27 @@ export type Progress = {
   super_likes_available: number;
   completion_percent: number | null;
 };
-export type Home = { season: Season; nickname: string; progress: Progress };
+export type Home = {
+  season: Season;
+  nickname: string;
+  role: "member" | "admin";
+  progress: Progress;
+};
+export type AdminSeason = {
+  seasonId: string;
+  name: string;
+  category: "love_similarity";
+  state: Season["state"];
+  visible: boolean;
+  canChange: boolean;
+};
+export type VisibilityAction = {
+  kind: "visibility";
+  userId: string;
+  seasonId: string;
+  actionId: string;
+  visible: boolean;
+};
 export type Choice = "PASS" | "LIKE" | "SUPER_LIKE";
 export type Track = {
   id: string;
@@ -50,6 +70,13 @@ export type VoteReceipt = {
   accepted_at: string;
 };
 export interface API {
+  adminSeason(seasonId: string, userId: string): Promise<AdminSeason>;
+  setLoveVisibility(action: VisibilityAction): Promise<unknown>;
+  transitionSeason(
+    seasonId: string,
+    userId: string,
+    state: Season["state"],
+  ): Promise<unknown>;
   myPicks(seasonId: string, userId: string): Promise<Pick[]>;
   nextTrack(seasonId: string): Promise<Track | null>;
   castVote(action: VoteAction): Promise<VoteReceipt>;
@@ -134,7 +161,61 @@ export function createAPI(url: string, key: string): API {
     },
   });
   let exchange: { code: string; promise: Promise<Identity> } | undefined;
+  async function adminToken(userId: string) {
+    const { data, error } = await client.auth.getSession();
+    if (error) throw error;
+    if (!data.session || data.session.user.id !== userId)
+      throw new Error("authentication_required");
+    return `Bearer ${data.session.access_token}`;
+  }
   return {
+    async adminSeason(seasonId, userId) {
+      const token = await adminToken(userId);
+      // This RPC authorizes the current season's admin. No results/progress or
+      // other members' records are fetched by the panel.
+      const { data, error } = await client
+        .rpc("get_love_similarity_visibility", {
+          p_season: seasonId,
+        })
+        .setHeader("Authorization", token)
+        .abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      const season = await client
+        .from("seasons")
+        .select("name")
+        .eq("id", seasonId)
+        .setHeader("Authorization", token)
+        .abortSignal(AbortSignal.timeout(30000))
+        .maybeSingle();
+      if (season.error) throw season.error;
+      if (!season.data) throw new Error("season_admin_required");
+      return { ...data, name: season.data.name } as AdminSeason;
+    },
+    async setLoveVisibility(action) {
+      const token = await adminToken(action.userId);
+      const { data, error } = await client
+        .rpc("set_love_similarity_visibility", {
+          p_season: action.seasonId,
+          p_visible: action.visible,
+          p_action: action.actionId,
+        })
+        .setHeader("Authorization", token)
+        .abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data;
+    },
+    async transitionSeason(seasonId, userId, state) {
+      const token = await adminToken(userId);
+      const { data, error } = await client
+        .rpc("transition_season", {
+          p_season: seasonId,
+          p_state: state,
+        })
+        .setHeader("Authorization", token)
+        .abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data;
+    },
     async restore() {
       const { data, error } = await client.auth.getSession();
       if (error) throw error;
@@ -280,7 +361,7 @@ export function createAPI(url: string, key: string): API {
           .maybeSingle(),
         client
           .from("season_members")
-          .select("nickname")
+          .select("nickname,role")
           .eq("season_id", seasonId)
           .eq("user_id", userId)
           .maybeSingle(),
@@ -293,6 +374,7 @@ export function createAPI(url: string, key: string): API {
       return {
         season: season.data as Season,
         nickname: member.data.nickname,
+        role: member.data.role,
         progress: progress.data as Progress,
       };
     },

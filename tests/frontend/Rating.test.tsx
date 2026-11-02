@@ -28,6 +28,9 @@ function fake() {
   let catalog = [...tracks];
   let state: Home["season"]["state"] = "VOTING";
   const api = {
+    adminSeason: vi.fn(),
+    setLoveVisibility: vi.fn(),
+    transitionSeason: vi.fn(),
     restore: vi.fn().mockResolvedValue({ id: uid }),
     subscribe: vi.fn<API["subscribe"]>(() => () => {}),
     signIn: vi.fn(),
@@ -37,6 +40,7 @@ function fake() {
     inspect: vi.fn(),
     accept: vi.fn(),
     home: vi.fn(async (): Promise<Home> => ({
+      role: "member",
       season: { id: sid, name: "Test season", year: 2026, state },
       nickname: "Duke",
       progress: {

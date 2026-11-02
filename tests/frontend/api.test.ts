@@ -165,3 +165,155 @@ it("reads every page of own picks with ordered credits and a stable cursor", asy
     artists: ["First", "Second"],
   });
 });
+
+describe("bounded season admin RPC adapter", () => {
+  function session(user = "admin") {
+    mocks.session.mockResolvedValue({
+      data: {
+        session: { user: { id: user }, access_token: "synthetic-token" },
+      },
+      error: null,
+    });
+  }
+  function result(data: unknown, error: unknown = null) {
+    const abortSignal = vi.fn().mockResolvedValue({ data, error });
+    const setHeader = vi.fn().mockReturnValue({ abortSignal });
+    mocks.rpc.mockReturnValue({ setHeader });
+    return { setHeader, abortSignal };
+  }
+  it("reads only authorized visibility metadata and the selected season name", async () => {
+    session();
+    const metadata = {
+      seasonId: "season",
+      category: "love_similarity",
+      state: "REVEAL",
+      canChange: true,
+      visible: false,
+    };
+    const rpc = result(metadata);
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      setHeader: vi.fn().mockReturnThis(),
+      abortSignal: vi.fn().mockReturnThis(),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { name: "Synthetic" }, error: null }),
+    };
+    mocks.from.mockReturnValue(query);
+    const api = createAPI("http://127.0.0.1:54321", "sb_publishable_test");
+    expect(await api.adminSeason("season", "admin")).toEqual({
+      ...metadata,
+      name: "Synthetic",
+    });
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith(
+      "get_love_similarity_visibility",
+      { p_season: "season" },
+    );
+    expect(rpc.setHeader).toHaveBeenCalledWith(
+      "Authorization",
+      "Bearer synthetic-token",
+    );
+    expect(mocks.from).toHaveBeenCalledExactlyOnceWith("seasons");
+    expect(query.select).toHaveBeenCalledWith("name");
+    expect(query.eq).toHaveBeenCalledWith("id", "season");
+    expect(query.setHeader).toHaveBeenCalledWith(
+      "Authorization",
+      "Bearer synthetic-token",
+    );
+  });
+  it("sends exact actor-bound visibility payload and a separate lifecycle payload", async () => {
+    session();
+    const rpc = result({});
+    const api = createAPI("http://127.0.0.1:54321", "sb_publishable_test");
+    await api.setLoveVisibility({
+      kind: "visibility",
+      userId: "admin",
+      seasonId: "season",
+      visible: true,
+      actionId: "stable-action",
+    });
+    expect(mocks.rpc).toHaveBeenLastCalledWith(
+      "set_love_similarity_visibility",
+      { p_season: "season", p_visible: true, p_action: "stable-action" },
+    );
+    await api.transitionSeason("season", "admin", "LOCKED");
+    expect(mocks.rpc).toHaveBeenLastCalledWith("transition_season", {
+      p_season: "season",
+      p_state: "LOCKED",
+    });
+    expect(rpc.setHeader).toHaveBeenCalledTimes(2);
+    expect(rpc.abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+  it("refuses all admin calls after account switching, before any RPC", async () => {
+    session("other-account");
+    const api = createAPI("http://127.0.0.1:54321", "sb_publishable_test");
+    await expect(api.adminSeason("season", "admin")).rejects.toThrow(
+      "authentication_required",
+    );
+    await expect(
+      api.transitionSeason("season", "admin", "REVEAL"),
+    ).rejects.toThrow("authentication_required");
+    await expect(
+      api.setLoveVisibility({
+        kind: "visibility",
+        userId: "admin",
+        seasonId: "season",
+        actionId: "saved",
+        visible: true,
+      }),
+    ).rejects.toThrow("authentication_required");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+  it("propagates admin denial without broadening the read", async () => {
+    session();
+    result(null, { message: "season_admin_required", code: "42501" });
+    const api = createAPI("http://127.0.0.1:54321", "sb_publishable_test");
+    await expect(api.adminSeason("season", "member")).rejects.toThrow(
+      "authentication_required",
+    );
+    await expect(api.adminSeason("season", "admin")).rejects.toEqual({
+      message: "season_admin_required",
+      code: "42501",
+    });
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+  it("reads the caller's own season role for the Home entry", async () => {
+    const seasonQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({
+          data: { id: "season", name: "Synthetic", year: 2026, state: "SETUP" },
+          error: null,
+        }),
+    };
+    const memberQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({
+          data: { nickname: "Admin", role: "admin" },
+          error: null,
+        }),
+    };
+    mocks.from.mockImplementation((name) =>
+      name === "seasons" ? seasonQuery : memberQuery,
+    );
+    mocks.rpc.mockResolvedValue({ data: {}, error: null });
+    const home = await createAPI(
+      "http://127.0.0.1:54321",
+      "sb_publishable_test",
+    ).home("season", "actor");
+    expect(home?.role).toBe("admin");
+    expect(memberQuery.select).toHaveBeenCalledWith("nickname,role");
+    expect(memberQuery.eq).toHaveBeenCalledWith("user_id", "actor");
+    expect(memberQuery.eq).toHaveBeenCalledWith("season_id", "season");
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("my_progress", {
+      p_season: "season",
+    });
+  });
+});

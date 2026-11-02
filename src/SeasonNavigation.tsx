@@ -6,10 +6,10 @@ export function SeasonNavigation({
   seasonName,
 }: {
   seasonId: string;
-  current: "rating" | "picks";
+  current: "rating" | "picks" | "admin";
   seasonName?: string;
 }) {
-  const rating = current === "picks";
+  const rating = current !== "rating";
   return (
     <nav className="season-navigation" aria-label="Season navigation">
       <Link to={`/seasons/${seasonId}`}>← Home</Link>

@@ -2,7 +2,7 @@
 
 ## Accepted Architecture Baseline
 
-This baseline is implemented by the database foundation; see [database-foundation.md](database-foundation.md) for contracts and verification. Use a mobile-first responsive web client, Supabase Auth with Google, and Supabase/Postgres for persistent data. GitHub is the source of truth; database migrations belong in source control. The frontend uses Vite, React, TypeScript, React Router, and supabase-js; Vercel Hobby and Supabase Cloud Free are selected for the initial hosted rollout; the existing operator importer remains local-only until its remote extension is reviewed. See [deployment.md](deployment.md) for environment boundaries and rollout gates. See [frontend.md](frontend.md) for OAuth and browser recovery behavior.
+This baseline is implemented by the database foundation; see [database-foundation.md](database-foundation.md) for contracts and verification. Use a mobile-first responsive web client, Supabase Auth with Google, and Supabase/Postgres for persistent data. GitHub is the source of truth; database migrations belong in source control. The frontend uses Vite, React, TypeScript, React Router, and supabase-js; Vercel Hobby and Supabase Cloud Free are selected for the initial hosted rollout; the operator importer defaults to local-only and now supports an explicitly project/season-bound Cloud dummy pilot with a separate Google session. See [deployment.md](deployment.md) for environment boundaries and rollout gates. See [frontend.md](frontend.md) for OAuth and browser recovery behavior.
 
 Keep the system simple enough for one developer. Prefer database constraints and narrowly scoped transactional operations over additional services. AI-authored database and security changes must remain explicit and reviewable.
 
@@ -56,9 +56,11 @@ The database suite tests duplicate requests, UUID/payload conflicts, concurrent 
 
 Reliable recovery is a priority alongside durable writes. The database foundation documents a repeatable local rebuild from migrations and synthetic fixtures and verifies transactional recovery from failed writes and lost responses. A local reset does not recover real voting history. Production backup retention and restore procedures remain open and must be settled and verified before collecting real season votes; no advanced recovery infrastructure is selected here.
 
-## Deferred Results Architecture
+## Love similarity server boundary
 
-`REVEAL` is a prerequisite, not automatic authorization for every result category or individual raw vote. Admin-controlled category visibility is an accepted future product direction; its mechanism and defaults remain open. The database foundation collects and protects source data only: no scoring, leaderboards, result aggregation APIs, artist rankings, similarity, party presentation, reveal-category implementation, or persisted result snapshots.
+`REVEAL` is a prerequisite, not automatic authorization for every result category or individual raw vote. Love similarity is hidden by default and requires a same-season admin's manual opening after REVEAL; its control is implemented in the [bounded season admin panel](season-admin-panel.md) alongside the existing forward lifecycle controls. Other category defaults remain open. The later [server contract](wrapped-results-server.md) implements private category settings and immutable visibility events, audited admin mutation/read RPCs, and a member-only pair-evidence RPC guarded by REVEAL and explicit opening. Reads and changes share the season lock. The foundation's raw-vote/event RLS, progress projections, vote versions and replay ledger remain unchanged; no result snapshots or results UI are added. The later panel fetches only admin-authorized visibility/state metadata and the selected season name. User/season-keyed sessions discard stale reads; a separate per-action journal replays only visibility actions, while lifecycle recovery reads current state without automatically resending a transition.
+
+The [results product baseline](results-and-wrapped.md) now selects love similarity v1 (75% loved-track overlap, 25% SL overlap). The [isolated calculation](../src/domain/taste-similarity.ts) and [synthetic tests](../tests/frontend/taste-similarity.test.ts) implement the [bounded brief](taste-similarity-v1-implementation.md), disconnected from live data and the application. No result API, persistence, RLS/grant change, or access to others' raw votes is introduced by this calculation. The later summary RPC supplies explicit server-side season, lifecycle, and category authorization, while a shared count helper and DTO adapter reuse the same formula; a client-side visibility check is insufficient. Algorithm versions are separate from integer vote versions, and raw choices/audit history remain unchanged.
 
 ## Editing and nickname identity
 
@@ -79,6 +81,7 @@ Future withdrawal preserves canonical identity, season membership, votes, and ev
 ## First importer implementation (2026-10-07)
 
 The first bounded local Spotify importer is implemented by `20261007000100_catalog_import.sql` and `scripts/spotify-import.py`. Earlier unimplemented/proposed labels describe the design milestone. See [implemented importer contracts and operating guide](spotify-importer.md) for private provider-neutral mappings, source designation audit, Google/Supabase operator authentication, separate Spotify PKCE, authoritative plans and exception decisions, transactional item receipts, retention, bounds, and validation. The accepted catalog rules and existing voting/privacy contracts remain unchanged.
+
 
 ## Mobile rating presentation (2026-10-11)
 

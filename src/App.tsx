@@ -32,6 +32,9 @@ const Rating = lazy(() =>
 const MyPicks = lazy(() =>
   import("./MyPicks").then((module) => ({ default: module.MyPicks })),
 );
+const SeasonAdmin = lazy(() =>
+  import("./SeasonAdmin").then((module) => ({ default: module.SeasonAdmin })),
+);
 
 const pendingKey = "hardstyle.pending-invitation";
 function pendingInvite() {
@@ -337,6 +340,15 @@ function Landing() {
 }
 function SeasonHome() {
   const { seasonId = "" } = useParams();
+  const { identity } = useAuth();
+  return (
+    <SeasonHomeSession
+      key={`${identity!.id}:${seasonId}`}
+      seasonId={seasonId}
+    />
+  );
+}
+function SeasonHomeSession({ seasonId }: { seasonId: string }) {
   const { api, identity } = useAuth();
   const [home, setHome] = useState<Home | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error" | "missing">(
@@ -461,6 +473,11 @@ function SeasonHome() {
           </span>
         </Link>
       </nav>
+      {home.role === "admin" && (
+        <Link className="admin-entry" to={`/seasons/${seasonId}/admin`}>
+          Season admin <span aria-hidden="true">→</span>
+        </Link>
+      )}
       <div className="progress-card">
         <p className="eyebrow">Your progress</p>
         <div className="home-progress-summary">
@@ -527,6 +544,16 @@ function Shell() {
       <main>
         {error && <Notice>{error}</Notice>}
         <Routes>
+          <Route
+            path="/seasons/:seasonId/admin"
+            element={
+              <RequireAuth>
+                <Suspense fallback={<Loading />}>
+                  <SeasonAdmin />
+                </Suspense>
+              </RequireAuth>
+            }
+          />
           <Route path="/auth/callback" element={<Callback />} />
           <Route
             path="/invite/:token"

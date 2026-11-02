@@ -52,10 +52,10 @@ There are no remaining product decisions blocking this database foundation. Prod
 ## Other Open Questions — Not Foundation Blockers
 
 - Full invitation expiry, revocation, resend, and Google-account-change features remain deferred. The accepted minimal identity contract is D24; broader features need not block the foundation.
-- Initial Super Like number: the API requires explicit nonnegative season configuration rather than a hard-coded product default. The product value can be chosen when creating a season.
+- Super Like season configuration remains explicit rather than a hard-coded product default. The working choice for the official 2026 season is 40 per member; see the accepted results planning below. Existing pilot/dummy allowances are not changed.
 - Destructive catalog edits, merging/deduplication of voted tracks, retention, and account deletion: the foundation exposes no destructive operations and preserves history; final policy is deferred.
 - Broader nickname rules, hosting, import/enrichment integrations, and production backup/restore operations. Production recovery is not a blocker to local foundation work, but must be defined and verified before real voting data is collected.
-- Scoring, tie-breaking, artist aggregation, result categories/toggles/defaults, party sequence, post-reveal individual vote visibility, and exceptional lifecycle corrections.
+- Song-scoring formulas, artist aggregation, shared-PASS and overall similarity, defaults for additional result categories, party sequence, unrestricted post-reveal individual-vote access, and exceptional lifecycle corrections remain open. Song tie policy, love similarity v1, and its manual category-opening policy were selected in the accepted results planning below.
 
 ## Database Foundation Scope
 
@@ -149,9 +149,15 @@ The first bounded local Spotify importer is implemented by `20261007000100_catal
 
 ## Accepted initial production rollout (2026-10-11)
 
-The owner selected Vercel Hobby and Supabase Cloud Free, with no paid upgrades or domain purchase for now. The requested frontend name is tiloz-ranking-2k26; its vercel.app domain remains subject to assignment. Production starts clean: local votes are experiments and are not transferred. Repeated hosted tests and a 2–3 user pilot use separate dummy seasons. The first dummy season allowance is 50; the official allowance remains open.
+The owner selected Vercel Hobby and Supabase Cloud Free, with no paid upgrades or domain purchase for now. The requested frontend name is tiloz-ranking-2k26; its vercel.app domain remains subject to assignment. Production starts clean: local votes are experiments and are not transferred. Repeated hosted tests and a 2–3 user pilot use separate dummy seasons. The first dummy season allowance is 50; the official allowance was open at this milestone and its later working selection is recorded below.
 
 A dummy season does not isolate shared schema/catalog changes or database restore. Destructive rehearsals require a separate disposable target once official data exists. Backup frequency, acceptable recovery loss/downtime, independent storage and scheduling remain open; tested recovery is required before official voting. See [deployment.md](deployment.md) for the runbook and unverified rollout status. Existing vote integrity, owner trust boundary and pre-REVEAL secrecy are unchanged.
+
+
+## Authorized Cloud dummy pilot (2026-10-11)
+
+The owner authorized a bounded production importer extension and supplied a Spotify source for the first dummy season. Remote operations require an exact HTTPS project origin, explicit project/season flags matching protected session metadata, a fresh Cloud Google operator session, and locally project/season-bound plan files. Existing Google-admin RPCs, Spotify PKCE grant, evidence-bound review, catalog/vote locks and secrecy remain unchanged. No service-role importer or direct table-write path is added. Full scans retain collision evidence; a stable first-20-occurrence apply limit bounds admission and retries. The owner explicitly approved the selected 2021–2025 release-year exceptions for this dummy season only. This does not approve other playlists, broader year exceptions, official-season voting or an unbounded production import. Recovery/restore readiness remains required before official voting.
+
 
 ## Mobile rating implementation details (2026-10-11)
 
@@ -170,3 +176,40 @@ Following the owner's phone screenshot and approval to continue, mobile Rating p
 ## Accepted borderless artwork and vote order (2026-10-11)
 
 The owner approved removing the visible artwork frame and permanent drag caption, and ordering vote controls as PASS left, SUPER LIKE center and LIKE right. Artwork fills its existing square drag surface without outer padding. Gesture and saving/receipt feedback use the existing instruction row below the controls, outside the album image, without reserving a separate frame band. This supersedes the original visual frame treatment while preserving gesture mapping, scrolling safety and all voting/privacy contracts. See [frontend.md](frontend.md) for implementation and verification.
+
+## Accepted results and Wrapped planning (2026-10-24)
+
+The owner chose a practical v1 to advance development, with explicit future revisions possible. These are planning decisions, not claims that results functionality is implemented. See [results-and-wrapped.md](results-and-wrapped.md) for precise definitions and status.
+
+| ID | Type | Decision | Rationale |
+| --- | --- | --- | --- |
+| D45 | Product | Group and interpersonal Wrapped is the primary outcome; song top 100–200 is another output and personal summaries are a bonus. | Prioritize shared favorites, differences, and named group stories. |
+| D46 | Product | Working official-2026 allowance: at most 40 SL per member, with no obligation to use all. Retain explicit season configuration and the existing audited-increase contract. | Provide a limited favorites set without rewarding unused votes or changing pilot data. |
+| D47 | Product | Same song-scoring rule for each voter; no extra power for fewer ratings/LIKEs/SLs. No minimum rater count for eligible song rankings, and closing need not wait for universal completion. | Count actual choices without turning missing votes into PASS or compensating incomplete ballots. |
+| D48 | Product | Equal song scores share competition rank (1, 2, 2, 4); include all tied tracks at the top-N cutoff, independently per ranking method. | Preserve meaningful ties rather than fabricate preference differences. |
+| D49 | Product | Love similarity v1 combines 75% loved-track set overlap and 25% SL set overlap on eligible co-rated tracks. Keep evidence counts and a separate algorithm version. | Recognize LIKE/SL shared affection and give matching favorites additional influence. |
+| D50 | Product | Named, bounded insights for season members after REVEAL are desired; raw individual ballots and unrestricted exports remain private. Final calculations may run after LOCKED but remain secret until authorized REVEAL access. | Enable the intended interpersonal experience while preserving existing secrecy and vote durability. |
+
+Shared-PASS and overall similarity, zero-denominator UI fallback, evidence thresholds for awards, artist aggregation, song-score values, song-ranking toggle defaults/status, and award selection remain open. Track coverage display is provisional. Candidate song formulas are not approved by D49. Formula selection uses synthetic examples only; unrevealed real votes must never be used for tuning.
+
+The [bounded calculation slice](taste-similarity-v1-implementation.md) is implemented as a [pure module](../src/domain/taste-similarity.ts) with [synthetic tests](../tests/frontend/taste-similarity.test.ts). It uses `taste-love-v1`, 0–1 values without rounding, explicit undefined-component reasons, and no combined score when either component is undefined. That calculation milestone introduced no application result path, database change, real-vote access, or deployment. The category-opening policy selected below now has a separately implemented [server boundary](wrapped-results-server.md); evidence display and undefined-score presentation still need design work.
+
+## Accepted season admin and category opening (2026-10-25)
+
+| ID | Type | Decision | Rationale |
+| --- | --- | --- | --- |
+| D51 | Product | Love similarity stays hidden by default. Only after REVEAL may an admin of that season manually open it to all members of that season; REVEAL alone does not open the category. | Keep the party reveal deliberate while preserving both lifecycle and category authorization. |
+| D52 | Product | The planned admin panel is per season and contains the love-similarity visibility control alongside season lifecycle controls. Existing forward-only, one-step transitions remain unchanged. | Integrate the feature into one season administration surface without introducing new lifecycle permissions. |
+
+The owner approved manual opening and specified its home in the upcoming per-season admin panel. See [wrapped-results-integration-brief.md](wrapped-results-integration-brief.md) for the approved policy and separately marked engineering/UI proposals. The decision update itself introduced no implementation. The subsequent [server slice](wrapped-results-server.md) uses private category storage/audit events, same-season admin configuration RPCs and a guarded member pair-summary RPC. These are engineering choices implementing D49–D52, not new product decisions. The later [bounded panel implementation](season-admin-panel.md) now provides the two approved controls, with deliberate confirmations and distinct lifecycle/visibility recovery. These UI and journal details are engineering choices, not new lifecycle permissions or product formulas. The results screen remains unimplemented. Other categories and detailed result presentation are not automatically approved.
+
+
+## Interim admin assignment and future season creation (2026-10-25)
+
+The owner requested setting each season's admins in the database, identifying accounts by Google email. The existing D23 membership role remains authoritative: resolve a verified Google account to its stable user ID and assign `admin` only within the selected season. The [owner procedure](season-admin-panel.md#admin-identity-and-interim-database-assignment) is an engineering operating choice under D20; it introduces no new email-based authorization field, browser grant or role-management API.
+
+| ID | Type | Decision | Rationale |
+| --- | --- | --- | --- |
+| D53 | Product — future work | Implement a season creation flow within the platform. Reuse the existing creation contract: a verified Google creator becomes the first admin of a new SETUP season. | Let the owner prepare future seasons through the app. |
+
+D53 records requested future scope, not a completed feature. Form design, validation/recovery, navigation and tests remain implementation work. Invitation delivery and role-management UI are separate scope. No account assignment, migration or database operation accompanies this documentation update.
