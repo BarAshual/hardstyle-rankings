@@ -54,6 +54,8 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [allowance, setAllowance] = useState("");
   const [allowanceReason, setAllowanceReason] = useState("");
   const [importContext, setImportContext] = useState<Record<string, unknown> | null>(null);
+  const [sourceId, setSourceId] = useState("");
+  const [sourceReason, setSourceReason] = useState("");
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
   >("loading");
@@ -473,6 +475,19 @@ function AdminSession({ seasonId }: { seasonId: string }) {
               <p>{String(importContext.total_tracks ?? importContext.active_tracks ?? 0)} total tracks · {String(importContext.active_tracks ?? 0)} active · {String(importContext.held_items ?? importContext.review_items ?? 0)} held for review</p>
             ) : <p className="fine">Import source not configured for this season yet.</p>}
             <p className="fine">Spotify and Apple Music links are validated together; duplicates and uncertain matches stay held for review.</p>
+            <div className="admin-member-invite">
+              <label htmlFor="spotify-source">Spotify playlist ID</label>
+              <div className="admin-heading-row">
+                <input id="spotify-source" value={sourceId} onChange={(event) => setSourceId(event.target.value)} placeholder="22-character playlist ID" />
+                <input aria-label="Import reason" value={sourceReason} onChange={(event) => setSourceReason(event.target.value)} placeholder="Reason" />
+                <button disabled={memberBusy || !api.designateImportSource || !sourceId.trim() || !sourceReason.trim()} onClick={async () => {
+                  setMemberBusy(true); setMemberMessage("");
+                  try { await api.designateImportSource?.(seasonId, user, sourceId.trim(), "IL", sourceReason.trim()); setMemberMessage("Import source saved."); setSourceId(""); setSourceReason(""); refresh(); }
+                  catch { setMemberMessage("Could not save the import source."); }
+                  finally { setMemberBusy(false); }
+                }}>Save source</button>
+              </div>
+            </div>
           </section>
           {confirmation && (
             <div

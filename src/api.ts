@@ -103,6 +103,7 @@ export interface API {
   increaseAllowance?(seasonId: string, userId: string, allowance: number, reason: string): Promise<unknown>;
   adminProgress?(seasonId: string, userId: string): Promise<AdminProgressRow[]>;
   importContext?(seasonId: string, userId: string): Promise<ImportContext>;
+  designateImportSource?(seasonId: string, userId: string, sourceId: string, market: string, reason: string): Promise<ImportContext>;
   transitionSeason(
     seasonId: string,
     userId: string,
@@ -304,6 +305,14 @@ export function createAPI(url: string, key: string): API {
       const token = await adminToken(userId);
       const { data, error } = await client.rpc("import_context", { p_season: seasonId })
         .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return (data ?? {}) as ImportContext;
+    },
+    async designateImportSource(seasonId, userId, sourceId, market, reason) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("designate_import_source", {
+        p_season: seasonId, p_source: sourceId, p_market: market, p_reason: reason,
+      }).setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
       if (error) throw error;
       return (data ?? {}) as ImportContext;
     },
