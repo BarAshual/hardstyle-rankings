@@ -21,7 +21,7 @@ import {
   visibilityRejected,
   type PendingAdmin,
 } from "./pendingAdmin";
-import type { AdminInvitation, AdminMember, Progress } from "./api";
+import type { AdminInvitation, AdminMember, AdminProgressRow } from "./api";
 
 type Confirmation =
   | { kind: "lifecycle"; from: Season["state"]; to: Season["state"] }
@@ -50,7 +50,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [memberMessage, setMemberMessage] = useState("");
   const [memberBusy, setMemberBusy] = useState(false);
-  const [progress, setProgress] = useState<Progress | null>(null);
+  const [progress, setProgress] = useState<AdminProgressRow[]>([]);
   const [allowance, setAllowance] = useState("");
   const [allowanceReason, setAllowanceReason] = useState("");
   const [importContext, setImportContext] = useState<Record<string, unknown> | null>(null);
@@ -103,9 +103,11 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       }
       setPending(readAdminPending(user, seasonId)[0] ?? null);
       setData(latest);
-      setMembers(memberRows);
+      const progressRows = progressResult.status === "fulfilled" ? progressResult.value : [];
+      const progressByUser = new Map(progressRows.map((row) => [row.user_id, row]));
+      setMembers(memberRows.map((member) => ({ ...member, ...(progressByUser.get(member.user_id) ?? {}) })));
       setInvitations(invitationRows);
-      setProgress(progressResult.status === "fulfilled" ? progressResult.value : null);
+      setProgress(progressRows);
       setImportContext(importResult.status === "fulfilled" ? importResult.value : null);
       setMessage("");
       setStatus("ready");
@@ -448,8 +450,8 @@ function AdminSession({ seasonId }: { seasonId: string }) {
           </section>
           <section className="admin-card" aria-labelledby="progress-heading">
             <h2 id="progress-heading">Season progress</h2>
-            {progress ? (
-              <p>{progress.rated}/{progress.active_tracks} ratings recorded · {progress.super_likes_used} Super Likes used · {progress.super_likes_available} available</p>
+            {progress.length ? (
+              <p>{progress.reduce((sum, row) => sum + row.rated, 0)}/{progress.reduce((sum, row) => sum + row.active_tracks, 0)} ratings recorded</p>
             ) : <p className="fine">Season progress is temporarily unavailable.</p>}
             <div className="admin-member-invite">
               <label htmlFor="allowance">Increase Super Like allowance</label>

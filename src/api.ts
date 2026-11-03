@@ -22,6 +22,7 @@ export type Progress = {
   super_likes_available: number;
   completion_percent: number | null;
 };
+export type AdminProgressRow = Pick<AdminMember, "user_id" | "nickname" | "role" | "active_tracks" | "rated" | "unrated" | "completion_percent">;
 export type Home = {
   season: Season;
   nickname: string;
@@ -97,7 +98,7 @@ export interface API {
   inviteMember?(seasonId: string, userId: string, email: string): Promise<string>;
   setMemberRole?(seasonId: string, userId: string, memberId: string, role: "member" | "admin"): Promise<unknown>;
   increaseAllowance?(seasonId: string, userId: string, allowance: number, reason: string): Promise<unknown>;
-  adminProgress?(seasonId: string, userId: string): Promise<Progress>;
+  adminProgress?(seasonId: string, userId: string): Promise<AdminProgressRow[]>;
   importContext?(seasonId: string, userId: string): Promise<ImportContext>;
   transitionSeason(
     seasonId: string,
@@ -294,7 +295,7 @@ export function createAPI(url: string, key: string): API {
       const { data, error } = await client.rpc("admin_progress", { p_season: seasonId })
         .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
       if (error) throw error;
-      return data as Progress;
+      return (data ?? []) as AdminProgressRow[];
     },
     async importContext(seasonId, userId) {
       const token = await adminToken(userId);
