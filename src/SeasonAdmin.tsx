@@ -47,6 +47,9 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [data, setData] = useState<AdminSeason | null>(null);
   const [members, setMembers] = useState<AdminMember[]>([]);
   const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [memberMessage, setMemberMessage] = useState("");
+  const [memberBusy, setMemberBusy] = useState(false);
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
   >("loading");
@@ -263,6 +266,29 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       : confirmation?.visible
         ? "open love similarity"
         : "hide love similarity";
+  async function invite() {
+    const email = inviteEmail.trim();
+    if (!email || !api.inviteMember) return;
+    setMemberBusy(true); setMemberMessage("");
+    try {
+      await api.inviteMember(seasonId, user, email);
+      setInviteEmail("");
+      setMemberMessage("Invitation recorded.");
+      refresh();
+    } catch { setMemberMessage("Could not record that invitation."); }
+    finally { setMemberBusy(false); }
+  }
+  async function changeRole(member: AdminMember) {
+    if (!api.setMemberRole) return;
+    setMemberBusy(true); setMemberMessage("");
+    try {
+      await api.setMemberRole(seasonId, user, member.user_id, member.role === "admin" ? "member" : "admin");
+      setMemberMessage("Role updated.");
+      refresh();
+    } catch (error) {
+      setMemberMessage(error instanceof Error && /last_admin/i.test(error.message) ? "A season must keep at least one admin." : "Could not update that role.");
+    } finally { setMemberBusy(false); }
+  }
   return (
     <section className="season-admin">
       <SeasonNavigation
@@ -395,11 +421,22 @@ function AdminSession({ seasonId }: { seasonId: string }) {
                   <li key={member.user_id}>
                     <strong>{member.nickname}</strong> <span className="fine">({member.role})</span>
                     <span className="fine">{member.rated}/{member.active_tracks} rated · {member.super_likes_available} Super Likes left</span>
+                    <button className="member-role-button" disabled={memberBusy || member.user_id === user} onClick={() => changeRole(member)}>
+                      {member.role === "admin" ? "Demote" : "Make admin"}
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
             <p className="fine">{invitations.filter((item) => !item.accepted_by).length} pending invitation(s).</p>
+            <div className="admin-member-invite">
+              <label htmlFor="invite-email">Invite by verified Google email</label>
+              <div className="admin-heading-row">
+                <input id="invite-email" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="name@example.com" />
+                <button onClick={invite} disabled={memberBusy || !inviteEmail.trim()}>Invite</button>
+              </div>
+            </div>
+            {memberMessage && <p className="fine" role="status">{memberMessage}</p>}
           </section>
           {confirmation && (
             <div

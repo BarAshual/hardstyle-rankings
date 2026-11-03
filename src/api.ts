@@ -95,6 +95,7 @@ export interface API {
   adminInvitations?(seasonId: string, userId: string): Promise<AdminInvitation[]>;
   inviteMember?(seasonId: string, userId: string, email: string): Promise<string>;
   setMemberRole?(seasonId: string, userId: string, memberId: string, role: "member" | "admin"): Promise<unknown>;
+  increaseAllowance?(seasonId: string, userId: string, allowance: number, reason: string): Promise<unknown>;
   transitionSeason(
     seasonId: string,
     userId: string,
@@ -273,6 +274,14 @@ export function createAPI(url: string, key: string): API {
       const token = await adminToken(userId);
       const { data, error } = await client.rpc("set_member_role", {
         p_season: seasonId, p_user: memberId, p_role: role,
+      }).setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data;
+    },
+    async increaseAllowance(seasonId, userId, allowance, reason) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("increase_allowance", {
+        p_season: seasonId, p_allowance: allowance, p_reason: reason,
       }).setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
       if (error) throw error;
       return data;

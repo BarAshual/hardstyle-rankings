@@ -201,6 +201,10 @@ h2 {
   padding: 0;
   list-style: none;
 }
+.admin-member-list li { display: grid; gap: .25rem; }
+.member-role-button { justify-self: start; padding: .45rem .7rem; }
+.admin-member-invite { margin-top: 1rem; display: grid; gap: .5rem; }
+.admin-member-invite input { min-width: 0; flex: 1; }
 
 .admin-member-list li {
   display: grid;
