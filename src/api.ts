@@ -22,7 +22,10 @@ export type Progress = {
   super_likes_available: number;
   completion_percent: number | null;
 };
-export type AdminProgressRow = Pick<AdminMember, "user_id" | "nickname" | "role" | "active_tracks" | "rated" | "unrated" | "completion_percent">;
+export type AdminProgressRow = {
+  user_id: string; nickname: string; role: "member" | "admin";
+  active_tracks: number; rated: number; unrated: number; completion_percent: number | null;
+};
 export type Home = {
   season: Season;
   nickname: string;

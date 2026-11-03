@@ -103,7 +103,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       }
       setPending(readAdminPending(user, seasonId)[0] ?? null);
       setData(latest);
-      const progressRows = progressResult.status === "fulfilled" ? progressResult.value : [];
+      const progressRows = progressResult.status === "fulfilled" ? (progressResult.value ?? []) : [];
       const progressByUser = new Map(progressRows.map((row) => [row.user_id, row]));
       setMembers(memberRows.map((member) => ({ ...member, ...(progressByUser.get(member.user_id) ?? {}) })));
       setInvitations(invitationRows);
