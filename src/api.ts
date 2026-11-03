@@ -231,7 +231,28 @@ export function createAPI(url: string, key: string): API {
       const token = await adminToken(userId);
       const { data, error } = await client.rpc("admin_members", { p_season: seasonId })
         .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
-      if (error) throw error;
+      if (error) {
+        // Keep the operational panel useful if the optional aggregate view is
+        // unavailable during a staged migration. RLS still limits this
+        // fallback to members of the selected season.
+        const fallback = await client
+          .from("season_members")
+          .select("user_id,nickname,role")
+          .eq("season_id", seasonId)
+          .setHeader("Authorization", token)
+          .abortSignal(AbortSignal.timeout(30000));
+        if (fallback.error) throw error;
+        return (fallback.data ?? []).map((member) => ({
+          ...member,
+          email: "",
+          active_tracks: 0,
+          rated: 0,
+          unrated: 0,
+          completion_percent: null,
+          super_likes_used: 0,
+          super_likes_available: 0,
+        })) as AdminMember[];
+      }
       return (data ?? []) as AdminMember[];
     },
     async adminInvitations(seasonId, userId) {
