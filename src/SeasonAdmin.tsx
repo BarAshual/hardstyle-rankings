@@ -21,6 +21,7 @@ import {
   visibilityRejected,
   type PendingAdmin,
 } from "./pendingAdmin";
+import type { AdminInvitation, AdminMember } from "./api";
 
 type Confirmation =
   | { kind: "lifecycle"; from: Season["state"]; to: Season["state"] }
@@ -44,6 +45,8 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const { api, identity } = useAuth();
   const user = identity!.id;
   const [data, setData] = useState<AdminSeason | null>(null);
+  const [members, setMembers] = useState<AdminMember[]>([]);
+  const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
   >("loading");
@@ -73,10 +76,11 @@ function AdminSession({ seasonId }: { seasonId: string }) {
         return;
       }
       const saved = readAdminPending(user, seasonId);
-      const latest = validateAdminSeason(
-        await api.adminSeason(seasonId, user),
-        seasonId,
-      );
+      const latest = validateAdminSeason(await api.adminSeason(seasonId, user), seasonId);
+      const [memberRows, invitationRows] = await Promise.all([
+        api.adminMembers?.(seasonId, user) ?? Promise.resolve([]),
+        api.adminInvitations?.(seasonId, user) ?? Promise.resolve([]),
+      ]);
       if (!active) return;
       // Lifecycle has no replay contract. A successful authoritative read is
       // its only recovery path, including after reload. Never resend it here.
@@ -85,6 +89,8 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       }
       setPending(readAdminPending(user, seasonId)[0] ?? null);
       setData(latest);
+      setMembers(memberRows);
+      setInvitations(invitationRows);
       setMessage("");
       setStatus("ready");
     }
@@ -374,6 +380,21 @@ function AdminSession({ seasonId }: { seasonId: string }) {
             >
               {data.visible ? "Hide love similarity" : "Open love similarity"}
             </button>
+          </section>
+          <section className="admin-card" aria-labelledby="members-heading">
+            <h2 id="members-heading">Members</h2>
+            <p className="fine">Lightweight progress only; votes and preferences stay private.</p>
+            {members.length === 0 ? <p>No members found.</p> : (
+              <ul className="admin-member-list">
+                {members.map((member) => (
+                  <li key={member.user_id}>
+                    <strong>{member.nickname}</strong> <span className="fine">({member.role})</span>
+                    <span className="fine">{member.rated}/{member.active_tracks} rated · {member.super_likes_available} Super Likes left</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="fine">{invitations.filter((item) => !item.accepted_by).length} pending invitation(s).</p>
           </section>
           {confirmation && (
             <div

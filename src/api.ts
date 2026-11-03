@@ -36,6 +36,25 @@ export type AdminSeason = {
   visible: boolean;
   canChange: boolean;
 };
+export type AdminMember = {
+  user_id: string;
+  email: string | null;
+  nickname: string;
+  role: "member" | "admin";
+  active_tracks: number;
+  rated: number;
+  unrated: number;
+  completion_percent: number | null;
+  super_likes_used: number;
+  super_likes_available: number;
+};
+export type AdminInvitation = {
+  id: string;
+  email: string;
+  created_at: string;
+  accepted_by: string | null;
+  accepted_at: string | null;
+};
 export type VisibilityAction = {
   kind: "visibility";
   userId: string;
@@ -72,6 +91,10 @@ export type VoteReceipt = {
 export interface API {
   adminSeason(seasonId: string, userId: string): Promise<AdminSeason>;
   setLoveVisibility(action: VisibilityAction): Promise<unknown>;
+  adminMembers?(seasonId: string, userId: string): Promise<AdminMember[]>;
+  adminInvitations?(seasonId: string, userId: string): Promise<AdminInvitation[]>;
+  inviteMember?(seasonId: string, userId: string, email: string): Promise<string>;
+  setMemberRole?(seasonId: string, userId: string, memberId: string, role: "member" | "admin"): Promise<unknown>;
   transitionSeason(
     seasonId: string,
     userId: string,
@@ -201,6 +224,35 @@ export function createAPI(url: string, key: string): API {
         })
         .setHeader("Authorization", token)
         .abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data;
+    },
+    async adminMembers(seasonId, userId) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("admin_members", { p_season: seasonId })
+        .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return (data ?? []) as AdminMember[];
+    },
+    async adminInvitations(seasonId, userId) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("admin_invitations", { p_season: seasonId })
+        .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return (data ?? []) as AdminInvitation[];
+    },
+    async inviteMember(seasonId, userId, email) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("invite_member", { p_season: seasonId, p_email: email })
+        .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data as string;
+    },
+    async setMemberRole(seasonId, userId, memberId, role) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("set_member_role", {
+        p_season: seasonId, p_user: memberId, p_role: role,
+      }).setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
       if (error) throw error;
       return data;
     },

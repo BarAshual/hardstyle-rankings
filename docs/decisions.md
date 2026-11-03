@@ -213,3 +213,17 @@ The owner requested setting each season's admins in the database, identifying ac
 | D53 | Product — future work | Implement a season creation flow within the platform. Reuse the existing creation contract: a verified Google creator becomes the first admin of a new SETUP season. | Let the owner prepare future seasons through the app. |
 
 D53 records requested future scope, not a completed feature. Form design, validation/recovery, navigation and tests remain implementation work. Invitation delivery and role-management UI are separate scope. No account assignment, migration or database operation accompanies this documentation update.
+
+## Expanded season operations (2026-11-03)
+
+The following implementation scope is approved for the dedicated `season-admin-operations` branch. Season creation remains owner-operated and outside the ongoing-season panel. The homepage may later list all seasons available to the signed-in account, but it must not create seasons in this slice.
+
+- A season must always retain at least one admin; removing or demoting the final admin is rejected.
+- Member and invitation operations are season-scoped. Admin assignment resolves a verified Google email to the stable Auth user ID; email text is never the authorization binding.
+- Member progress and Super Like allowance appear as lightweight operational fields in the members section. Preference values and group aggregates remain excluded.
+- Spotify and Apple Music imports share one canonical catalog. Automatic admission requires both provider links, a clean duplicate check against existing catalog/provider mappings, and no ambiguous match. Incomplete or duplicate candidates are held for review while valid items continue.
+- Catalog totals are shown as a compact summary. Adding tracks during `VOTING` preserves existing votes and audit history.
+- A standalone audit/recovery dashboard is deferred. Operation-specific receipts, errors and retry controls remain part of each workflow.
+- Publishing controls apply only to approved result categories. `love_similarity` remains hidden until `REVEAL` and requires deliberate same-season admin opening; other formulas/categories need separate approval.
+
+These are accepted product boundaries for implementation. Exact tables, RPC names, provider adapters, review payloads and UI layout remain engineering work and must preserve RLS, locks, immutable history, idempotency and synthetic-test requirements.
