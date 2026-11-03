@@ -55,6 +55,7 @@ export type AdminInvitation = {
   accepted_by: string | null;
   accepted_at: string | null;
 };
+export type ImportContext = { [key: string]: unknown };
 export type VisibilityAction = {
   kind: "visibility";
   userId: string;
@@ -97,6 +98,7 @@ export interface API {
   setMemberRole?(seasonId: string, userId: string, memberId: string, role: "member" | "admin"): Promise<unknown>;
   increaseAllowance?(seasonId: string, userId: string, allowance: number, reason: string): Promise<unknown>;
   adminProgress?(seasonId: string, userId: string): Promise<Progress>;
+  importContext?(seasonId: string, userId: string): Promise<ImportContext>;
   transitionSeason(
     seasonId: string,
     userId: string,
@@ -293,6 +295,13 @@ export function createAPI(url: string, key: string): API {
         .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
       if (error) throw error;
       return data as Progress;
+    },
+    async importContext(seasonId, userId) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("import_context", { p_season: seasonId })
+        .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return (data ?? {}) as ImportContext;
     },
     async transitionSeason(seasonId, userId, state) {
       const token = await adminToken(userId);

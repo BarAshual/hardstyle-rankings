@@ -53,6 +53,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [allowance, setAllowance] = useState("");
   const [allowanceReason, setAllowanceReason] = useState("");
+  const [importContext, setImportContext] = useState<Record<string, unknown> | null>(null);
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
   >("loading");
@@ -83,10 +84,11 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       }
       const saved = readAdminPending(user, seasonId);
       const latest = validateAdminSeason(await api.adminSeason(seasonId, user), seasonId);
-      const [memberResult, invitationResult, progressResult] = await Promise.allSettled([
+      const [memberResult, invitationResult, progressResult, importResult] = await Promise.allSettled([
         api.adminMembers?.(seasonId, user) ?? Promise.resolve([]),
         api.adminInvitations?.(seasonId, user) ?? Promise.resolve([]),
         api.adminProgress?.(seasonId, user) ?? Promise.resolve(null),
+        api.importContext?.(seasonId, user) ?? Promise.resolve(null),
       ]);
       // Optional operational metadata must never prevent the authoritative
       // lifecycle/visibility panel from loading. A missing or denied optional
@@ -104,6 +106,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       setMembers(memberRows);
       setInvitations(invitationRows);
       setProgress(progressResult.status === "fulfilled" ? progressResult.value : null);
+      setImportContext(importResult.status === "fulfilled" ? importResult.value : null);
       setMessage("");
       setStatus("ready");
     }
@@ -461,6 +464,13 @@ function AdminSession({ seasonId }: { seasonId: string }) {
                 }}>Update</button>
               </div>
             </div>
+          </section>
+          <section className="admin-card" aria-labelledby="catalog-heading">
+            <h2 id="catalog-heading">Catalog</h2>
+            {importContext ? (
+              <p>{String(importContext.total_tracks ?? importContext.active_tracks ?? 0)} total tracks · {String(importContext.active_tracks ?? 0)} active · {String(importContext.held_items ?? importContext.review_items ?? 0)} held for review</p>
+            ) : <p className="fine">Catalog summary is temporarily unavailable.</p>}
+            <p className="fine">Spotify and Apple Music links are validated together; duplicates and uncertain matches stay held for review.</p>
           </section>
           {confirmation && (
             <div
