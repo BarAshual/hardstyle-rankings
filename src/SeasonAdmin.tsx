@@ -77,10 +77,15 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       }
       const saved = readAdminPending(user, seasonId);
       const latest = validateAdminSeason(await api.adminSeason(seasonId, user), seasonId);
-      const [memberRows, invitationRows] = await Promise.all([
+      const [memberResult, invitationResult] = await Promise.allSettled([
         api.adminMembers?.(seasonId, user) ?? Promise.resolve([]),
         api.adminInvitations?.(seasonId, user) ?? Promise.resolve([]),
       ]);
+      // Optional operational metadata must never prevent the authoritative
+      // lifecycle/visibility panel from loading. A missing or denied optional
+      // RPC is represented as an empty section and can be retried explicitly.
+      const memberRows = memberResult.status === "fulfilled" ? memberResult.value : [];
+      const invitationRows = invitationResult.status === "fulfilled" ? invitationResult.value : [];
       if (!active) return;
       // Lifecycle has no replay contract. A successful authoritative read is
       // its only recovery path, including after reload. Never resend it here.
