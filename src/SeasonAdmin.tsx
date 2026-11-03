@@ -471,7 +471,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
             <h2 id="catalog-heading">Catalog</h2>
             {importContext ? (
               <p>{String(importContext.total_tracks ?? importContext.active_tracks ?? 0)} total tracks · {String(importContext.active_tracks ?? 0)} active · {String(importContext.held_items ?? importContext.review_items ?? 0)} held for review</p>
-            ) : <p className="fine">Catalog summary is temporarily unavailable.</p>}
+            ) : <p className="fine">Import source not configured for this season yet.</p>}
             <p className="fine">Spotify and Apple Music links are validated together; duplicates and uncertain matches stay held for review.</p>
           </section>
           {confirmation && (
