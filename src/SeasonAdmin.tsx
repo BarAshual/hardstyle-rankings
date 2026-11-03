@@ -21,7 +21,7 @@ import {
   visibilityRejected,
   type PendingAdmin,
 } from "./pendingAdmin";
-import type { AdminInvitation, AdminMember } from "./api";
+import type { AdminInvitation, AdminMember, Progress } from "./api";
 
 type Confirmation =
   | { kind: "lifecycle"; from: Season["state"]; to: Season["state"] }
@@ -50,6 +50,9 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [memberMessage, setMemberMessage] = useState("");
   const [memberBusy, setMemberBusy] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [allowance, setAllowance] = useState("");
+  const [allowanceReason, setAllowanceReason] = useState("");
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
   >("loading");
@@ -80,9 +83,10 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       }
       const saved = readAdminPending(user, seasonId);
       const latest = validateAdminSeason(await api.adminSeason(seasonId, user), seasonId);
-      const [memberResult, invitationResult] = await Promise.allSettled([
+      const [memberResult, invitationResult, progressResult] = await Promise.allSettled([
         api.adminMembers?.(seasonId, user) ?? Promise.resolve([]),
         api.adminInvitations?.(seasonId, user) ?? Promise.resolve([]),
+        api.adminProgress?.(seasonId, user) ?? Promise.resolve(null),
       ]);
       // Optional operational metadata must never prevent the authoritative
       // lifecycle/visibility panel from loading. A missing or denied optional
@@ -99,6 +103,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       setData(latest);
       setMembers(memberRows);
       setInvitations(invitationRows);
+      setProgress(progressResult.status === "fulfilled" ? progressResult.value : null);
       setMessage("");
       setStatus("ready");
     }
@@ -437,6 +442,25 @@ function AdminSession({ seasonId }: { seasonId: string }) {
               </div>
             </div>
             {memberMessage && <p className="fine" role="status">{memberMessage}</p>}
+          </section>
+          <section className="admin-card" aria-labelledby="progress-heading">
+            <h2 id="progress-heading">Season progress</h2>
+            {progress ? (
+              <p>{progress.rated}/{progress.active_tracks} ratings recorded · {progress.super_likes_used} Super Likes used · {progress.super_likes_available} available</p>
+            ) : <p className="fine">Season progress is temporarily unavailable.</p>}
+            <div className="admin-member-invite">
+              <label htmlFor="allowance">Increase Super Like allowance</label>
+              <div className="admin-heading-row">
+                <input id="allowance" type="number" min="0" value={allowance} onChange={(event) => setAllowance(event.target.value)} placeholder="New total" />
+                <input aria-label="Reason" value={allowanceReason} onChange={(event) => setAllowanceReason(event.target.value)} placeholder="Reason" />
+                <button disabled={memberBusy || !api.increaseAllowance || !allowance || !allowanceReason.trim()} onClick={async () => {
+                  setMemberBusy(true); setMemberMessage("");
+                  try { await api.increaseAllowance?.(seasonId, user, Number(allowance), allowanceReason.trim()); setAllowance(""); setAllowanceReason(""); setMemberMessage("Allowance updated."); refresh(); }
+                  catch { setMemberMessage("Could not update the allowance."); }
+                  finally { setMemberBusy(false); }
+                }}>Update</button>
+              </div>
+            </div>
           </section>
           {confirmation && (
             <div
