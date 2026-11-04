@@ -60,6 +60,7 @@ export type AdminInvitation = {
   accepted_at: string | null;
 };
 export type ImportContext = { [key: string]: unknown };
+export type ImportPlan = { run: string; checksum: string; status: string; items: Array<{ position: number; candidate: Record<string, unknown>; evidence: { reasons?: string[] }; decision?: Record<string, unknown> | null; receipt?: Record<string, unknown> | null }> };
 export type VisibilityAction = {
   kind: "visibility";
   userId: string;
@@ -105,6 +106,9 @@ export interface API {
   importContext?(seasonId: string, userId: string): Promise<ImportContext>;
   designateImportSource?(seasonId: string, userId: string, sourceId: string, market: string, reason: string): Promise<ImportContext>;
   designateImportSources?(seasonId: string, userId: string, spotifySource: string, appleSource: string, market: string, reason: string): Promise<ImportContext>;
+  createImportPlan?(seasonId: string, userId: string, sourceVersion: number, sourceId: string, market: string, snapshot: string, candidates: unknown[], runId: string): Promise<ImportPlan>;
+  reviewImportItem?(runId: string, userId: string, checksum: string, position: number, decision: Record<string, unknown>): Promise<void>;
+  applyImportItem?(runId: string, userId: string, checksum: string, position: number): Promise<Record<string, unknown>>;
   transitionSeason(
     seasonId: string,
     userId: string,
@@ -325,6 +329,26 @@ export function createAPI(url: string, key: string): API {
       }).setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
       if (error) throw error;
       return (data ?? {}) as ImportContext;
+    },
+    async createImportPlan(seasonId, userId, sourceVersion, sourceId, market, snapshot, candidates, runId) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("create_import_plan", { p_season: seasonId, p_run: runId, p_source_version: sourceVersion, p_source: sourceId, p_market: market, p_snapshot: snapshot, p_candidates: candidates })
+        .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data as ImportPlan;
+    },
+    async reviewImportItem(runId, userId, checksum, position, decision) {
+      const token = await adminToken(userId);
+      const { error } = await client.rpc("review_import_item", { p_run: runId, p_checksum: checksum, p_position: position, p_decision: decision })
+        .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+    },
+    async applyImportItem(runId, userId, checksum, position) {
+      const token = await adminToken(userId);
+      const { data, error } = await client.rpc("apply_import_item", { p_run: runId, p_checksum: checksum, p_position: position })
+        .setHeader("Authorization", token).abortSignal(AbortSignal.timeout(30000));
+      if (error) throw error;
+      return data as Record<string, unknown>;
     },
     async transitionSeason(seasonId, userId, state) {
       const token = await adminToken(userId);

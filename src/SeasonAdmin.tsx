@@ -21,7 +21,7 @@ import {
   visibilityRejected,
   type PendingAdmin,
 } from "./pendingAdmin";
-import type { AdminInvitation, AdminMember, AdminProgressRow } from "./api";
+import type { AdminInvitation, AdminMember, AdminProgressRow, ImportPlan } from "./api";
 
 type Confirmation =
   | { kind: "lifecycle"; from: Season["state"]; to: Season["state"] }
@@ -56,6 +56,8 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [importContext, setImportContext] = useState<Record<string, unknown> | null>(null);
   const [sourceId, setSourceId] = useState("");
   const [appleSourceId, setAppleSourceId] = useState("");
+  const [importJson, setImportJson] = useState("");
+  const [importPlan, setImportPlan] = useState<ImportPlan | null>(null);
   const [sourceReason, setSourceReason] = useState("");
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
@@ -490,6 +492,27 @@ function AdminSession({ seasonId }: { seasonId: string }) {
                 }}>Save source</button>
               </div>
             </div>
+            <div className="admin-member-invite">
+              <label htmlFor="import-json">Provider candidate payload (dry run)</label>
+              <textarea id="import-json" value={importJson} onChange={(event) => setImportJson(event.target.value)} rows={5} placeholder='[{"kind":"track","id":"...","title":"...","artists":[]}]' />
+              <button disabled={memberBusy || !api.createImportPlan || !importJson.trim()} onClick={async () => {
+                setMemberBusy(true); setMemberMessage("");
+                try {
+                  const candidates = JSON.parse(importJson);
+                  const configured = importContext ?? {};
+                  const plan = await api.createImportPlan?.(seasonId, user, Number(configured.version ?? 1), String(configured.source_id ?? sourceId), "IL", `admin-${Date.now()}`, candidates, crypto.randomUUID());
+                  setImportPlan(plan ?? null); setMemberMessage("Dry-run plan created.");
+                } catch { setMemberMessage("Could not create the import plan. Check the JSON and paired sources."); }
+                finally { setMemberBusy(false); }
+              }}>Create dry-run plan</button>
+            </div>
+            {importPlan && <ul className="admin-member-list" aria-label="Import review items">
+              {importPlan.items.map((item) => <li key={item.position}>
+                <strong>{String(item.candidate.title ?? item.candidate.kind ?? "Item")}</strong>
+                <span className="fine">{item.evidence.reasons?.length ? `Review required: ${item.evidence.reasons.join(", ")}` : "Ready for admission"}</span>
+                {item.evidence.reasons?.length ? <button disabled={memberBusy || !api.reviewImportItem} onClick={async () => { setMemberBusy(true); try { await api.reviewImportItem?.(importPlan.run, user, importPlan.checksum, item.position, { action: "distinct", reason: "Confirmed by season admin", include_year: true }); setMemberMessage("Review saved."); } catch { setMemberMessage("Could not save review."); } finally { setMemberBusy(false); } }}>Mark distinct</button> : <button disabled={memberBusy || !api.applyImportItem} onClick={async () => { setMemberBusy(true); try { await api.applyImportItem?.(importPlan.run, user, importPlan.checksum, item.position); setMemberMessage("Item applied."); } catch { setMemberMessage("Could not apply item."); } finally { setMemberBusy(false); } }}>Apply item</button>}
+              </li>)}
+            </ul>}
           </section>
           {confirmation && (
             <div
