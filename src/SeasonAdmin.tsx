@@ -55,6 +55,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [allowanceReason, setAllowanceReason] = useState("");
   const [importContext, setImportContext] = useState<Record<string, unknown> | null>(null);
   const [sourceId, setSourceId] = useState("");
+  const [appleSourceId, setAppleSourceId] = useState("");
   const [sourceReason, setSourceReason] = useState("");
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
@@ -479,10 +480,11 @@ function AdminSession({ seasonId }: { seasonId: string }) {
               <label htmlFor="spotify-source">Spotify playlist ID</label>
               <div className="admin-heading-row">
                 <input id="spotify-source" value={sourceId} onChange={(event) => setSourceId(event.target.value)} placeholder="22-character playlist ID" />
+                <input id="apple-source" value={appleSourceId} onChange={(event) => setAppleSourceId(event.target.value)} placeholder="Apple Music track/playlist URL" />
                 <input aria-label="Import reason" value={sourceReason} onChange={(event) => setSourceReason(event.target.value)} placeholder="Reason" />
-                <button disabled={memberBusy || !api.designateImportSource || !sourceId.trim() || !sourceReason.trim()} onClick={async () => {
+                <button disabled={memberBusy || !api.designateImportSources || !sourceId.trim() || !appleSourceId.trim() || !sourceReason.trim()} onClick={async () => {
                   setMemberBusy(true); setMemberMessage("");
-                  try { await api.designateImportSource?.(seasonId, user, sourceId.trim(), "IL", sourceReason.trim()); setMemberMessage("Import source saved."); setSourceId(""); setSourceReason(""); refresh(); }
+                  try { await api.designateImportSources?.(seasonId, user, sourceId.trim(), appleSourceId.trim(), "IL", sourceReason.trim()); setMemberMessage("Both provider sources saved."); setSourceId(""); setAppleSourceId(""); setSourceReason(""); refresh(); }
                   catch { setMemberMessage("Could not save the import source."); }
                   finally { setMemberBusy(false); }
                 }}>Save source</button>
