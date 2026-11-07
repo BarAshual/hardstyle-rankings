@@ -1,6 +1,32 @@
 # First Spotify importer
 
-Implemented on 2026-10-07 against the accepted [catalog policy](catalog-ingestion.md). This is an explicitly invoked local operator tool; no scheduler, web administration, playback, correction/merge tooling, or remote database writes. Existing frontend projections and voting APIs are unchanged.
+## Paired Spotify + Apple validation
+
+The season admin panel requires a Spotify playlist identifier and an Apple Music
+track/playlist URL together when configuring a new import source. The operator
+runner now supports the same pairing for a dry run:
+
+```text
+python3 scripts/spotify-import.py designate \
+  --season <season-uuid> --playlist <spotify-url> \
+  --apple-source <apple-track-or-playlist-url> \
+  --market IL --reason "Season catalog refresh"
+
+python3 scripts/spotify-import.py dry-run \
+  --season <season-uuid> --playlist <spotify-url> \
+  --apple-source <apple-track-or-playlist-url> \
+  --apple-token <developer-token> --output <plan.json>
+```
+
+The Apple developer token is used only for the read-only scan and is never
+written to importer state or sent to Supabase. Every Spotify track must have
+exactly one Apple match by ISRC, or by normalized title and credited artist;
+unmatched or ambiguous tracks fail the paired validation before a plan is
+created. Existing Spotify-only local runs remain supported for migration and
+historical plans, but paired admission is the approved path for new catalog
+imports.
+
+Implemented on 2026-10-07 against the accepted [catalog policy](catalog-ingestion.md). The original local milestone is an explicitly invoked operator tool; no scheduler, web administration, playback or correction/merge tooling. The bounded Cloud dummy-pilot extension below supersedes the original remote-write exclusion. Existing frontend projections and voting APIs are unchanged.
 
 ## Authorization and schema
 
@@ -16,7 +42,7 @@ Source designation is explicit, has a required reason, records actor/time/old/ne
 
 ## Local setup and commands
 
-Python 3.9+ and the standard library suffice. Run from the repository root. Use a disposable local Supabase project; the CLI only accepts `http://127.0.0.1:PORT` with no path, credentials, query, or fragment. An external database needs a separately reviewed operational extension and backup/restore readiness; this implementation deliberately does not offer a remote-write switch.
+Python 3.9+ and the standard library suffice. Run from the repository root. Use a disposable local Supabase project; the CLI only accepts `http://127.0.0.1:PORT` with no path, credentials, query, or fragment. The default commands reject external databases. The separately authorized Cloud dummy-pilot extension below adds explicit target flags; backup/restore readiness remains required before official season voting.
 
 Apply migrations with `supabase migration up --local` after verifying the local target. Never reset a local project containing real Auth/catalog data to run tests. Follow [database-foundation.md](database-foundation.md) for the synthetic database suite, or use a separate disposable Supabase project/ports.
 
@@ -208,3 +234,34 @@ Production deployment and backup/recovery, Apple Music ingestion, scheduled sync
 - Local state: regular Supabase 54321/54322, one 2026 season, VOTING, allowance 50, catalog counts above. Resolve target/season/source through the supported authenticated context and protected ignored operator state; no local UUIDs, account identifiers or private source identifiers belong in committed handoff docs. Never reuse a smoke-target session for another target.
 - Preserve voting secrecy and history. Any future catalog operation requires an explicit bounded task, current target/source verification, a fresh plan and review of changed material evidence. Separate disposable fixtures are required for destructive tests. No ignored state was cleaned or copied into Git at closeout.
 - The next feature is intentionally unspecified. Plan it separately against the authoritative documents and the remaining boundaries above; milestone completion does not authorize deferred features, deployment, lifecycle changes or unattended catalog apply.
+
+
+## Bounded Cloud dummy-pilot extension (2026-10-11)
+
+The deployment owner authorized adapting the importer for a production dummy-season pilot. Local operation remains the default: a remote session is rejected without both `--project-ref` and `--confirm-season`. No migration or database authorization contract changes are introduced.
+
+Create a separate mode-0700 state directory and mode-0600 bootstrap file containing `url`, a public `sb_publishable_…` key in `anon_key`, `project_ref`, and the target season UUID in `season`. Never copy a local Google session into it. Commands require exact agreement between this binding, the explicit flags and the HTTPS `PROJECT_REF.supabase.co` origin; arbitrary hosts, credentials and paths are rejected before refresh or API access. Existing user tokens must have the expected issuer and authenticated role; this is a defensive target check, not signature verification or a replacement for Supabase authorization. Fresh Google PKCE login and session refresh retain protected storage. The independent Spotify grant can read the explicitly supplied playlist; it grants no Cloud authority and is not copied into the Cloud Google session.
+
+Allow only the selected operator callback `http://127.0.0.1:8889/callback/*` in the production Supabase Auth redirect configuration. The random callback nonce and PKCE exchange remain mandatory. Remove that rule when operator logins are no longer needed. Login must complete in the same browser that initiated the operator handshake.
+
+Example prefix, with owner-confirmed values:
+
+```sh
+python3 scripts/spotify-import.py --session .importer/production-pilot/supabase.json --project-ref PROJECT_REF --confirm-season SEASON_UUID app-login
+python3 scripts/spotify-import.py --session .importer/production-pilot/supabase.json --project-ref PROJECT_REF --confirm-season SEASON_UUID designate --season SEASON_UUID --playlist PLAYLIST_ID --reason 'Approved dummy pilot source'
+python3 scripts/spotify-import.py --session .importer/production-pilot/supabase.json --project-ref PROJECT_REF --confirm-season SEASON_UUID dry-run --season SEASON_UUID --playlist PLAYLIST_ID --output .importer/production-pilot/plan.json
+python3 scripts/spotify-import.py --session .importer/production-pilot/supabase.json --project-ref PROJECT_REF --confirm-season SEASON_UUID apply --plan .importer/production-pilot/plan.json --max-items 20
+```
+
+A complete Spotify scan still supplies evidence for the entire playlist. Cloud plan files and lost-acknowledgement markers include the explicit project/season binding; local or differently bound files cannot be reused. `--max-items 20` applies only the first 20 occurrences in the authoritative plan, preserving that prefix on retries and skipping already-received items. It may admit fewer than 20 tracks due to duplicate/invalid entries or unapproved exceptions. Remaining occurrences retain pending/review state; partial status and exit 2 are expected when the rest of the full plan is not applied. Do not rerun without the limit to complete a report incidentally. Review exceptions through the existing evidence-bound workflow; dummy status does not automatically approve year or identity exceptions.
+
+Four new mocked regressions and the ten existing importer tests pass (14 total): strict Cloud origin/session binding, wrong-target and privileged-token rejection before network access, plan binding, and retry-stable prefix limits. No frontend or SQL contract changed. Hosted Google, plan/apply/replay, multi-user authorization and recovery validation are separate checkpoints; this extension is not official-voting readiness. Recovery automation/restore rehearsal remains required before real season votes.
+
+
+### Hosted dummy-pilot checkpoint
+
+A fresh Cloud Google PKCE login completed into the protected production-only operator session. Source designation succeeded through the authenticated admin RPC. The supplied playlist had 36 occurrences on one complete page, with zero provider retries. A fresh hosted plan held all 36 for release-year review. The owner explicitly approved the first 20 year exceptions; no additional identity exceptions appeared for that prefix. Existing review RPCs recorded those decisions before apply.
+
+Bounded apply admitted 20 canonical tracks, 12 artists, 20 track mappings and 20 active season memberships. A fresh full scan/plan and the same first-20 apply produced 20 already-present outcomes and zero new tracks, artists, mappings or memberships. The other 16 occurrences remain unapproved and unapplied; plan status review-required and exit 2 are expected, not an instruction to expand the pilot. Hosted authenticated catalog reads returned all 20 active tracks. Anonymous season reads and import-context RPC access returned authorization denial. No vote choices were queried or created by the operator.
+
+The owner-authorized SETUP → VOTING transition succeeded through the real authenticated Data API and produced exactly one lifecycle event. Allowance remains 50. Hosted multi-user invitation/secrecy and vote durability tests, backup automation and restore rehearsal remain outstanding. An initial lifecycle request used the wrong RPC parameter name and returned 404 without a transition; the corrected request and audit check confirm one successful transition only. No database migration, frontend change, commit or push occurred in this checkpoint.

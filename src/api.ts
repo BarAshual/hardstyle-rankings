@@ -60,7 +60,25 @@ export type AdminInvitation = {
   accepted_at: string | null;
 };
 export type ImportContext = { [key: string]: unknown };
-export type ImportPlan = { run: string; checksum: string; status: string; items: Array<{ position: number; candidate: Record<string, unknown>; evidence: { reasons?: string[] }; decision?: Record<string, unknown> | null; receipt?: Record<string, unknown> | null }> };
+export type ImportEvidence = {
+  reasons?: string[];
+  matches?: string[];
+  known_track?: string | null;
+  release_date?: string | null;
+};
+export type ImportPlanItem = {
+  position: number;
+  candidate: Record<string, unknown>;
+  evidence: ImportEvidence;
+  decision?: Record<string, unknown> | null;
+  receipt?: Record<string, unknown> | null;
+};
+export type ImportPlan = {
+  run: string;
+  checksum: string;
+  status: string;
+  items: ImportPlanItem[];
+};
 export type VisibilityAction = {
   kind: "visibility";
   userId: string;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded local operator importer. Standard library only; no browser/admin secrets."""
+"""Bounded operator importer; local by default, explicitly bound Cloud pilots. Standard library only; no browser/admin secrets."""
 import argparse
 import base64
 import datetime
@@ -25,6 +25,7 @@ import webbrowser
 STATE = Path(__file__).resolve().parents[1] / '.importer'
 ID = re.compile(r'^[A-Za-z0-9]{22}$')
 SCOPES = 'playlist-read-private playlist-read-collaborative'
+APPLE_ID = re.compile(r'^\d{5,30}$')
 
 
 class ImportFailure(Exception):
@@ -39,6 +40,19 @@ def playlist_id(value):
     if u.scheme != 'https' or u.netloc != 'open.spotify.com' or not m or u.fragment:
         raise ImportFailure('invalid_playlist')
     return m[1]
+
+
+def apple_source(value):
+    """Return a stable Apple Music catalog identifier from a track/playlist URL."""
+    if not isinstance(value, str):
+        raise ImportFailure('invalid_apple_source')
+    u = urllib.parse.urlsplit(value)
+    if u.scheme != 'https' or u.netloc not in ('music.apple.com', 'itunes.apple.com') or u.fragment or u.query:
+        raise ImportFailure('invalid_apple_source')
+    parts = [p for p in u.path.split('/') if p]
+    if len(parts) < 3 or parts[1] not in ('playlist', 'song') or not APPLE_ID.fullmatch(parts[-1]):
+        raise ImportFailure('invalid_apple_source')
+    return {'kind': parts[1], 'storefront': parts[0], 'id': parts[-1], 'url': value}
 
 
 def protected_read(path):
@@ -284,6 +298,82 @@ class Spotify:
         raise ImportFailure('playlist_changed_during_scan')
 
 
+def _norm_text(value):
+    return re.sub(r'\s+', ' ', str(value or '').strip().casefold())
+
+
+def _apple_candidate(item):
+    if not isinstance(item, dict) or item.get('type') != 'songs' or not isinstance(item.get('attributes'), dict):
+        return {'kind': 'invalid'}
+    a = item['attributes']
+    title, artists = a.get('name'), a.get('artistName')
+    if not isinstance(title, str) or not title.strip() or not isinstance(artists, str) or not artists.strip():
+        return {'kind': 'invalid'}
+    return {'kind': 'track', 'id': str(item.get('id', '')), 'title': title.strip(),
+            'artists': [{'id': 'apple:' + _norm_text(artists), 'name': artists.strip()}],
+            'duration_ms': a.get('durationInMillis') if isinstance(a.get('durationInMillis'), int) else None,
+            'isrc': a.get('isrc') if isinstance(a.get('isrc'), str) else None,
+            'release_date': (a.get('releaseDate') or '')[:10] or None,
+            'release_precision': 'day', 'album': a.get('albumName'), 'artwork': None,
+            'url': a.get('url'), 'available': True, 'original_id': None}
+
+
+class AppleMusic:
+    """Read-only Apple catalog adapter used to validate paired imports."""
+    def __init__(self, developer_token, storefront='us', fetch=request):
+        self.token, self.storefront, self.fetch = developer_token, storefront, fetch
+        self.pages = self.observed = 0
+
+    def get(self, url):
+        u = urllib.parse.urlsplit(url)
+        if u.scheme != 'https' or u.netloc != 'api.music.apple.com' or not u.path.startswith('/v1/catalog/'):
+            raise ImportFailure('invalid_provider_url')
+        result = self.fetch(url, headers={'Authorization': 'Bearer ' + self.token})
+        if not isinstance(result, dict):
+            raise ImportFailure('invalid_provider_response')
+        return result
+
+    def scan(self, source):
+        parsed = apple_source(source) if isinstance(source, str) else source
+        base = f"https://api.music.apple.com/v1/catalog/{parsed['storefront']}/{parsed['kind']}s/{parsed['id']}"
+        if parsed['kind'] == 'song':
+            data = self.get(base + '?include=albums').get('data', [])
+            return parsed['id'], [_apple_candidate(item) for item in data]
+        url = base + '/tracks?limit=100'
+        candidates, visited = [], set()
+        while url:
+            if url in visited or len(visited) >= 100:
+                raise ImportFailure('pagination_limit')
+            visited.add(url)
+            page = self.get(url)
+            data = page.get('data')
+            if not isinstance(data, list) or len(candidates) + len(data) > 5000:
+                raise ImportFailure('incomplete_playlist_access')
+            candidates.extend(_apple_candidate(item) for item in data)
+            self.pages += 1; self.observed += len(data)
+            url = page.get('next')
+            if url is not None and not isinstance(url, str):
+                raise ImportFailure('invalid_pagination')
+        return parsed['id'], candidates
+
+
+def validate_paired_sources(spotify_candidates, apple_candidates):
+    """Require every admitted Spotify occurrence to have exactly one Apple match."""
+    remaining = list(apple_candidates)
+    for candidate in spotify_candidates:
+        if candidate.get('kind') != 'track':
+            continue
+        isrc = candidate.get('isrc')
+        matches = [a for a in remaining if isrc and a.get('isrc') == isrc]
+        if not matches:
+            key = (_norm_text(candidate.get('title')), tuple(_norm_text(x.get('name')) for x in candidate.get('artists', [])))
+            matches = [a for a in remaining if (_norm_text(a.get('title')), tuple(_norm_text(x.get('name')) for x in a.get('artists', []))) == key]
+        if len(matches) != 1:
+            raise ImportFailure('paired_source_mismatch')
+        remaining.remove(matches[0])
+    return True
+
+
 def local_url(url):
     u = urllib.parse.urlsplit(url)
     if u.scheme != 'http' or u.hostname != '127.0.0.1' or not u.port or u.username or u.password or u.path or u.query or u.fragment:
@@ -291,9 +381,45 @@ def local_url(url):
     return url
 
 
-def app_login(path, port=8889):
+def database_target(config, project_ref=None, season=None):
+    url = config['url'].rstrip('/')
+    if project_ref is None:
+        return local_url(url)
+    if not re.fullmatch(r'[a-z]{20}', project_ref) or not season:
+        raise ImportFailure('explicit_project_and_season_required')
+    try:
+        season = str(uuid.UUID(season))
+    except (ValueError, TypeError):
+        raise ImportFailure('invalid_target_season') from None
+    if url != 'https://' + project_ref + '.supabase.co':
+        raise ImportFailure('project_url_mismatch')
+    if config.get('project_ref') != project_ref or config.get('season') != season:
+        raise ImportFailure('session_target_mismatch')
+    key = config['anon_key']
+    if not isinstance(key, str) or not key.startswith('sb_publishable_'):
+        # Cloud pilot deliberately accepts only the recognizable public key type.
+        raise ImportFailure('cloud_publishable_key_required')
+    token = config.get('access_token')
+    if token:
+        try:
+            claims = json.loads(base64.urlsafe_b64decode(token.split('.')[1] + '==='))
+        except (ValueError, IndexError, TypeError):
+            raise ImportFailure('invalid_cloud_user_token') from None
+        # This only rejects accidental wrong-target/privileged credentials;
+        # Supabase remains responsible for signature and authorization checks.
+        if not isinstance(claims, dict) or claims.get('role') != 'authenticated' or claims.get('iss') != url + '/auth/v1':
+            raise ImportFailure('cloud_user_token_target_mismatch')
+    return url
+
+
+def plan_target(plan, project_ref, season):
+    if project_ref and plan.get('target') != {'project_ref': project_ref, 'season': season}:
+        raise ImportFailure('plan_target_mismatch')
+
+
+def app_login(path, port=8889, project_ref=None, season=None):
     config = protected_read(path)
-    base = local_url(config['url'].rstrip('/'))
+    base = database_target(config, project_ref, season)
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
     nonce = secrets.token_urlsafe(32)
@@ -332,19 +458,20 @@ def app_login(path, port=8889):
                      body={'auth_code': result['code'], 'code_verifier': verifier}, retries=0)
     tokens.setdefault('expires_at', time.time() + tokens['expires_in'])
     config.update({k: tokens[k] for k in ('access_token', 'refresh_token', 'expires_at')})
+    database_target(config, project_ref, season)
     protected_write(path, config)
 
 
 class Database:
-    def __init__(self, path, fetch=request):
+    def __init__(self, path, fetch=request, project_ref=None, season=None):
         config = protected_read(path)
-        self.url = config['url'].rstrip('/')
-        local_url(self.url)
+        self.url = database_target(config, project_ref, season)
         if config.get('expires_at', float('inf')) <= time.time() + 60:
             fresh = fetch(self.url + '/auth/v1/token?grant_type=refresh_token', headers={'apikey': config['anon_key']},
                           body={'refresh_token': config['refresh_token']}, retries=0)
             fresh.setdefault('expires_at', time.time() + fresh['expires_in'])
             config.update({k: fresh[k] for k in ('access_token', 'refresh_token', 'expires_at')})
+            database_target(config, project_ref, season)
             protected_write(path, config)
         self.headers = {'apikey': config['anon_key'], 'Authorization': 'Bearer ' + config['access_token']}
         self.fetch = fetch
@@ -396,6 +523,8 @@ def summary(plan):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session', type=Path, default=STATE / 'supabase.json')
+    parser.add_argument('--project-ref')
+    parser.add_argument('--confirm-season')
     sub = parser.add_subparsers(dest='command', required=True)
     app = sub.add_parser('app-login')
     app.add_argument('--port', type=int, default=8889)
@@ -405,29 +534,49 @@ def main():
     designate = sub.add_parser('designate')
     designate.add_argument('--season', required=True)
     designate.add_argument('--playlist', required=True)
+    designate.add_argument('--apple-source')
     designate.add_argument('--market', default='IL')
     designate.add_argument('--reason', required=True)
     dry = sub.add_parser('dry-run')
     dry.add_argument('--season', required=True)
     dry.add_argument('--playlist', required=True)
+    dry.add_argument('--apple-source', help='Apple Music track/playlist URL; required with --apple-token for paired validation')
+    dry.add_argument('--apple-token', help='Apple Music developer token; never written to importer state')
     dry.add_argument('--market')
     dry.add_argument('--output', type=Path, required=True)
     dry.add_argument('--run', default=str(uuid.uuid4()))
     for command in ('apply', 'review', 'status'):
         p = sub.add_parser(command)
         p.add_argument('--plan', type=Path, required=True)
+        if command == 'apply':
+            p.add_argument('--max-items', type=int)
         if command == 'review':
             p.add_argument('--decisions', type=Path, required=True)
     args = parser.parse_args()
+    if bool(args.project_ref) != bool(args.confirm_season):
+        raise ImportFailure('explicit_project_and_season_required')
+    if args.project_ref:
+        database_target(protected_read(args.session), args.project_ref, args.confirm_season)
+        if getattr(args, 'season', args.confirm_season) != args.confirm_season:
+            raise ImportFailure('command_season_mismatch')
+        print(json.dumps({'target_project': args.project_ref, 'target_season': args.confirm_season}), file=sys.stderr)
     if args.command == 'app-login':
-        app_login(args.session, args.port)
+        app_login(args.session, args.port, args.project_ref, args.confirm_season)
         return
     if args.command == 'spotify-login':
         pkce_login(args.client_id, args.port)
         return
-    db = Database(args.session)
+    db = Database(args.session, project_ref=args.project_ref, season=args.confirm_season) if args.project_ref else Database(args.session)
+    binding = {'project_ref': args.project_ref, 'season': args.confirm_season} if args.project_ref else None
+    if args.command == 'apply' and args.max_items is not None and not 1 <= args.max_items <= 5000:
+        raise ImportFailure('invalid_item_limit')
     if args.command == 'designate':
-        result = db.rpc('designate_import_source', p_season=args.season, p_source=playlist_id(args.playlist), p_market=args.market, p_reason=args.reason)
+        spotify = playlist_id(args.playlist)
+        if args.apple_source:
+            apple = apple_source(args.apple_source)
+            result = db.rpc('designate_import_sources', p_season=args.season, p_spotify_source=spotify, p_apple_source=apple['url'], p_market=args.market, p_reason=args.reason)
+        else:
+            result = db.rpc('designate_import_source', p_season=args.season, p_source=spotify, p_market=args.market, p_reason=args.reason)
         print(json.dumps(result))
         return
     if args.command == 'dry-run':
@@ -444,12 +593,22 @@ def main():
         except BaseException:
             print(json.dumps({'status': 'interrupted' if sys.exc_info()[0] == KeyboardInterrupt else 'failed', 'pages_observed': adapter.pages, 'occurrences_observed': adapter.observed, 'rate_limit_retries': adapter.rate_limit_retries, 'transient_retries': adapter.transient_retries}), file=sys.stderr)
             raise
-        protected_write(args.output, {'run': args.run, 'checksum': None, 'status': 'interrupted'})
+        if bool(args.apple_source) != bool(args.apple_token):
+            raise ImportFailure('paired_sources_require_token_and_url')
+        paired_scan = None
+        if args.apple_source:
+            paired_scan, apple_candidates = AppleMusic(args.apple_token).scan(args.apple_source)
+            validate_paired_sources(candidates, apple_candidates)
+        protected_write(args.output, {'run': args.run, 'checksum': None, 'status': 'interrupted', **({'target': binding} if binding else {})})
         plan = db.rpc('create_import_plan', p_season=args.season, p_run=args.run, p_source_version=context['version'], p_source=source, p_market=market, p_snapshot=snapshot, p_candidates=candidates)
-        plan['scan'] = {'pages': adapter.pages, 'rate_limit_retries': adapter.rate_limit_retries, 'transient_retries': adapter.transient_retries}
+        if binding:
+            plan['target'] = binding
+        plan['scan'] = {'pages': adapter.pages, 'rate_limit_retries': adapter.rate_limit_retries, 'transient_retries': adapter.transient_retries,
+                        'paired_apple_source': paired_scan, 'paired_validation': bool(paired_scan)}
         protected_write(args.output, plan)
     else:
         local = protected_read(args.plan)
+        plan_target(local, args.project_ref, args.confirm_season)
         plan = db.rpc('read_import_plan', p_run=local['run'])
         if local.get('checksum') is not None and local['checksum'] != plan['checksum']:
             raise ImportFailure('stale_plan')
@@ -464,7 +623,10 @@ def main():
         elif args.command == 'apply':
             failed = []
             try:
-                for item in plan['items']:
+                selected = plan['items'] if args.max_items is None else plan['items'][:args.max_items]
+                for item in selected:
+                    if item['receipt'] is not None:
+                        continue
                     try:
                         db.rpc('apply_import_item', **common, p_position=item['position'])
                     except ImportFailure as error:
@@ -479,6 +641,8 @@ def main():
             failed = [error for error in failed if error['position'] not in recovered]
             if failed:
                 print(json.dumps({'item_errors': failed}), file=sys.stderr)
+        if binding:
+            plan['target'] = binding
         protected_write(args.plan, plan)
     report = summary(plan)
     report['scan'] = plan.get('scan', {})

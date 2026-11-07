@@ -29,6 +29,24 @@ class SpotifyTests(unittest.TestCase):
         for entry,kind in (({'item':None},'removed'),(item(is_local=True),'skipped'),(item(type='episode'),'skipped'),(item(id=None),'invalid'),(item(artists=[]),'invalid')):
             self.assertEqual(m.normalize(entry)['kind'],kind)
 
+    def test_paired_apple_source_and_matching(self):
+        source = m.apple_source('https://music.apple.com/il/playlist/test/1234567890')
+        self.assertEqual(source['kind'], 'playlist')
+        self.assertEqual(source['storefront'], 'il')
+        with self.assertRaises(m.ImportFailure):
+            m.apple_source('https://music.apple.com/il/playlist/test/not-an-id')
+        spotify = {'kind':'track','title':'Original (Extended Mix)','artists':[{'id':ARTIST,'name':'Artist & Text'}],'isrc':'USAAA1234567'}
+        apple = {'kind':'track','title':'Original (Extended Mix)','artists':[{'id':'apple:a','name':'Artist & Text'}],'isrc':'USAAA1234567'}
+        self.assertTrue(m.validate_paired_sources([spotify], [apple]))
+        with self.assertRaisesRegex(m.ImportFailure, 'paired_source_mismatch'):
+            m.validate_paired_sources([spotify], [])
+
+    def test_apple_scan_rejects_untrusted_pagination(self):
+        def fetch(url, **_):
+            return {'data': [], 'next': 'https://evil.invalid/next'}
+        with self.assertRaises(m.ImportFailure):
+            m.AppleMusic('fixture', fetch=fetch).scan('https://music.apple.com/us/playlist/test/1234567890')
+
     def test_pagination_snapshot_rescan_and_no_partial_plan(self):
         calls=[]; snapshots=iter(['one','two','three','three'])
         def fetch(url,**_):
@@ -170,3 +188,70 @@ class SpotifyTests(unittest.TestCase):
                 self.assertEqual(m.normalize(entry)['kind'],'invalid')
         for entry in (item(type='episode'),item(type='track',is_local=True)):
             self.assertEqual(m.normalize(entry)['kind'],'skipped')
+
+
+class CloudTargetTests(unittest.TestCase):
+    project = 'qlljthzktgrnpsnysnwq'
+    season = '40e56921-f6a2-45c6-a54e-d619600a52de'
+
+    def config(self, **changes):
+        value = {'url': 'https://' + self.project + '.supabase.co',
+                 'anon_key': 'sb_publishable_fixture', 'project_ref': self.project,
+                 'season': self.season}
+        value.update(changes)
+        return value
+
+    def jwt(self, **changes):
+        claims = {'role': 'authenticated', 'iss': 'https://' + self.project + '.supabase.co/auth/v1'}
+        claims.update(changes)
+        return 'header.' + m.base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b'=').decode() + '.signature'
+
+    def test_cloud_requires_explicit_matching_session_and_exact_https_origin(self):
+        valid = self.config()
+        self.assertEqual(m.database_target(valid,self.project,self.season),valid['url'])
+        with self.assertRaises(m.ImportFailure): m.database_target(valid)
+        for changes in ({'url':'http://' + self.project + '.supabase.co'},
+                        {'url':valid['url'] + '/auth'}, {'url':valid['url'] + '?x=1'},
+                        {'url':valid['url'] + '@evil.invalid'}, {'project_ref':'a'*20},
+                        {'season':'00000000-0000-0000-0000-000000000000'},
+                        {'anon_key':'sb_secret_fixture'}):
+            with self.subTest(changes=changes), self.assertRaises(m.ImportFailure):
+                m.database_target(self.config(**changes),self.project,self.season)
+
+    def test_wrong_project_and_privileged_tokens_rejected_before_network(self):
+        for token in (self.jwt(role='service_role'),self.jwt(iss='http://127.0.0.1:54321/auth/v1'),'malformed'):
+            with tempfile.TemporaryDirectory() as directory:
+                path=Path(directory)/'session.json'
+                m.protected_write(path,self.config(access_token=token,refresh_token='never-send',expires_at=0))
+                with patch.object(m,'request') as fetch, self.assertRaises(m.ImportFailure):
+                    m.Database(path,fetch=fetch,project_ref=self.project,season=self.season)
+                fetch.assert_not_called()
+        self.assertEqual(m.database_target(self.config(access_token=self.jwt()),self.project,self.season),self.config()['url'])
+
+    def test_cloud_plan_binding_rejects_local_or_other_season(self):
+        for plan in ({'run':'local'}, {'target':{'project_ref':self.project,'season':'wrong'}},
+                     {'target':{'project_ref':'a'*20,'season':self.season}}):
+            with self.assertRaises(m.ImportFailure):m.plan_target(plan,self.project,self.season)
+        m.plan_target({'target':{'project_ref':self.project,'season':self.season}},self.project,self.season)
+
+    def test_apply_limit_retries_same_prefix_without_growing_selection(self):
+        import copy
+        plan={'run':'run','checksum':'checksum','status':'partial','items':[
+            {'position':n,'candidate':{'kind':'track','id':str(n)},'evidence':{'reasons':[]},'decision':None,'receipt':None}
+            for n in range(3)]}
+        calls=[]
+        class Database:
+            def rpc(self,name,**body):
+                if name=='apply_import_item':
+                    n=body['p_position'];calls.append(n)
+                    plan['items'][n]['receipt']={'outcome':'added','track_id':str(n)}
+                    return plan['items'][n]['receipt']
+                if name in ('read_import_plan','finish_import_run'):return copy.deepcopy(plan)
+                raise AssertionError(name)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'plan.json';m.protected_write(path,plan)
+            with patch.object(m,'Database',return_value=Database()), patch.object(m.sys,'argv',['importer','apply','--plan',str(path),'--max-items','2']), patch('builtins.print'):
+                self.assertEqual(m.main(),2)
+                self.assertEqual(m.main(),2)
+        self.assertEqual(calls,[0,1])
+        self.assertIsNone(plan['items'][2]['receipt'])

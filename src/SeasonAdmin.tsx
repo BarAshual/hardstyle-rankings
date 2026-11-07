@@ -58,6 +58,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
   const [appleSourceId, setAppleSourceId] = useState("");
   const [importJson, setImportJson] = useState("");
   const [importPlan, setImportPlan] = useState<ImportPlan | null>(null);
+  const [reviewReason, setReviewReason] = useState<Record<number, string>>({});
   const [sourceReason, setSourceReason] = useState("");
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "denied"
@@ -304,6 +305,23 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       setMemberMessage(error instanceof Error && /last_admin/i.test(error.message) ? "A season must keep at least one admin." : "Could not update that role.");
     } finally { setMemberBusy(false); }
   }
+  async function reviewImport(position: number, action: "distinct" | "attach" | "keep" | "defer" | "decline", target?: string) {
+    if (!importPlan || !api.reviewImportItem) return;
+    setMemberBusy(true); setMemberMessage("");
+    try {
+      const reason = reviewReason[position]?.trim() || (action === "defer" ? "Held for later review" : action === "decline" ? "Declined by season admin" : "Confirmed by season admin");
+      await api.reviewImportItem(importPlan.run, user, importPlan.checksum, position, {
+        action, reason, include_year: true,
+        ...(target ? { target, same_version: true } : {}),
+      });
+      setImportPlan((current) => current && ({
+        ...current,
+        items: current.items.map((item) => item.position === position ? { ...item, decision: { action, reason, ...(target ? { target, same_version: true } : {}) } } : item),
+      }));
+      setMemberMessage("Review saved. Apply it when the evidence is approved.");
+    } catch { setMemberMessage("Could not save review."); }
+    finally { setMemberBusy(false); }
+  }
   return (
     <section className="season-admin">
       <SeasonNavigation
@@ -506,13 +524,30 @@ function AdminSession({ seasonId }: { seasonId: string }) {
                 finally { setMemberBusy(false); }
               }}>Create dry-run plan</button>
             </div>
-            {importPlan && <ul className="admin-member-list" aria-label="Import review items">
-              {importPlan.items.map((item) => <li key={item.position}>
-                <strong>{String(item.candidate.title ?? item.candidate.kind ?? "Item")}</strong>
-                <span className="fine">{item.evidence.reasons?.length ? `Review required: ${item.evidence.reasons.join(", ")}` : "Ready for admission"}</span>
-                {item.evidence.reasons?.length ? <button disabled={memberBusy || !api.reviewImportItem} onClick={async () => { setMemberBusy(true); try { await api.reviewImportItem?.(importPlan.run, user, importPlan.checksum, item.position, { action: "distinct", reason: "Confirmed by season admin", include_year: true }); setMemberMessage("Review saved."); } catch { setMemberMessage("Could not save review."); } finally { setMemberBusy(false); } }}>Mark distinct</button> : <button disabled={memberBusy || !api.applyImportItem} onClick={async () => { setMemberBusy(true); try { await api.applyImportItem?.(importPlan.run, user, importPlan.checksum, item.position); setMemberMessage("Item applied."); } catch { setMemberMessage("Could not apply item."); } finally { setMemberBusy(false); } }}>Apply item</button>}
-              </li>)}
-            </ul>}
+            {importPlan && <>
+              <p className="fine">{importPlan.items.length} occurrences · {importPlan.items.filter((item) => item.evidence.reasons?.length).length} held · {importPlan.items.filter((item) => item.receipt).length} applied</p>
+              <ul className="admin-member-list" aria-label="Import review items">
+                {importPlan.items.map((item) => {
+                  const reasons = item.evidence.reasons ?? [];
+                  const target = item.evidence.matches?.[0];
+                  return <li key={item.position}>
+                    <strong>{String(item.candidate.title ?? item.candidate.kind ?? "Item")}</strong>
+                    <span className="fine">{reasons.length ? `Review required: ${reasons.join(", ")}` : item.receipt ? `Applied: ${String(item.receipt.outcome ?? "complete")}` : "Ready for admission"}</span>
+                    {reasons.length > 0 && !item.receipt && <>
+                      <input aria-label={`Review reason ${item.position}`} value={reviewReason[item.position] ?? ""} onChange={(event) => setReviewReason((current) => ({ ...current, [item.position]: event.target.value }))} placeholder="Review reason" />
+                      <div className="admin-heading-row">
+                        <button disabled={memberBusy || !api.reviewImportItem} onClick={() => reviewImport(item.position, "distinct")}>Mark distinct</button>
+                        {target && <button disabled={memberBusy || !api.reviewImportItem} onClick={() => reviewImport(item.position, "attach", target)}>Attach match</button>}
+                        <button disabled={memberBusy || !api.reviewImportItem} onClick={() => reviewImport(item.position, "keep")}>Keep mapping</button>
+                        <button disabled={memberBusy || !api.reviewImportItem} onClick={() => reviewImport(item.position, "defer")}>Defer</button>
+                        <button disabled={memberBusy || !api.reviewImportItem} onClick={() => reviewImport(item.position, "decline")}>Decline</button>
+                      </div>
+                    </>}
+                    {reasons.length === 0 && !item.receipt && <button disabled={memberBusy || !api.applyImportItem} onClick={async () => { setMemberBusy(true); try { await api.applyImportItem?.(importPlan.run, user, importPlan.checksum, item.position); setMemberMessage("Item applied."); } catch { setMemberMessage("Could not apply item."); } finally { setMemberBusy(false); } }}>Apply item</button>}
+                  </li>;
+                })}
+              </ul>
+            </>}
           </section>
           {confirmation && (
             <div
