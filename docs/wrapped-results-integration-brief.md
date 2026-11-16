@@ -1,14 +1,14 @@
 # Wrapped Results: Season Admin Integration Brief
 
-2026-10-25. Approved product policy with proposed implementation boundaries. This brief originally introduced no implementation. The subsequent [server slice and integration contract](wrapped-results-server.md) implements category storage, audited admin RPCs, guarded pair summaries and shared calculation DTOs; admin-panel controls and result UI remain outside that server slice. The subsequent [bounded panel](season-admin-panel.md) implements lifecycle/visibility controls and recovery without fetching results. The existing [love calculation](taste-similarity-v1-implementation.md) remains unchanged mathematically.
+2026-10-25, revised 2026-11-16. REVEAL is the single deliberate publication moment; the subsequent [server slice and integration contract](wrapped-results-server.md) preserves category history for compatibility, provides guarded pair summaries and shared calculation DTOs, and the [bounded panel](season-admin-panel.md) provides lifecycle controls without fetching results. The existing [love calculation](taste-similarity-v1-implementation.md) remains unchanged mathematically.
 
 ## Accepted product contract
 
-- The app will have a season-scoped admin panel. It will contain season lifecycle controls and the love-similarity category visibility control.
+- The app will have a season-scoped admin panel. It contains season lifecycle controls; the results page owns presentation of approved categories.
 - Lifecycle controls reuse SETUP -> VOTING -> LOCKED -> REVEAL, advancing one step at a time. No backward transition, reopening, automatic date-based reveal, or new admin role is approved.
-- Love similarity is hidden by default. Entering REVEAL does not automatically publish it.
-- After REVEAL, an admin of that season may manually open the category to all members of that season. This category control belongs in the planned season admin panel.
-- Before REVEAL, even admins cannot access the results or use the visibility control to expose them. Results require both REVEAL and explicit category opening.
+- Love similarity is unavailable before REVEAL. Entering REVEAL is the single deliberate publish action and makes it available on the unified results page.
+- There is no separate category-opening control in the admin panel; historical visibility records remain preserved for audit compatibility.
+- Before REVEAL, even admins cannot access the results. Results require REVEAL and remain scoped to same-season members.
 - Opening the category does not expose raw ballots, audit records, unrestricted exports, other seasons, or public access.
 
 The accepted control is for love similarity. Defaults for other future categories and the party sequence remain open. Read [results-and-wrapped.md](results-and-wrapped.md) and [decisions.md](decisions.md), D51–D52, for the canonical decisions.
@@ -48,7 +48,7 @@ The screen's layout, evidence presentation, and undefined-score copy still need 
 - A two-season/dummy-versus-official fixture proves no cross-season contribution. Neither endpoint nor client exposes raw ballots or audit events.
 - Count-based and ballot-based paths agree on the existing synthetic 1,200-track references, missing-vote handling, eligibility, undefined unions, and algorithm ID.
 - Results never enter ordinary catalog/progress reads, preference logs, public caches, or sanitized authorization errors.
-- When integrated with the planned panel, UI tests cover allowed lifecycle advances and the REVEAL-only visibility control. When a result screen is implemented, test hidden, loading, error, defined, and undefined states with evidence display.
+- When integrated with the panel, UI tests cover allowed lifecycle advances, REVEAL publication and the results link. When a result screen is implemented, test pre-REVEAL denial, loading, error, defined, and undefined states with evidence display.
 - Run required database integration checks for the new contract and npm test/typecheck/lint/build for TypeScript/UI changes. Review links/whitespace for docs. Preserve votes, immutable audit history, idempotency, integer versions, current RLS guarantees, and all unrelated edits; do not commit unless asked.
 
 The next implementation chat should take an explicitly bounded slice of this brief: server/category contract first, panel controls with the season-admin-panel work, and result presentation after its design is settled. The broader Wrapped scope remains desired.

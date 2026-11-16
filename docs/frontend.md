@@ -2,7 +2,7 @@
 
 ## Stack and scope
 
-Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. The first voting UI is described below. The [bounded season admin panel](season-admin-panel.md) provides lifecycle and love-similarity visibility controls. There is no results screen, invitation delivery or music-provider integration in this panel.
+Vite 8, React 19, TypeScript, React Router, and supabase-js. Vitest and Testing Library exercise application behavior with mocked external authentication. Dependencies are pinned in package.json/package-lock.json; `npm ci` installs the reproducible dependency tree. Fonts are packaged locally, with no third-party font requests. The first voting UI is described below. The [bounded season admin panel](season-admin-panel.md) provides lifecycle controls and links to the unified results page after REVEAL. There is no results screen, invitation delivery or music-provider integration in this panel.
 
 The app routes are `/`, `/auth/callback`, `/invite/:invitationId`, `/seasons/:seasonId`, `/seasons/:seasonId/rate`, `/seasons/:seasonId/my-picks`, and `/seasons/:seasonId/admin`. BrowserRouter requires a production host to serve index.html for these paths; the tracked vercel.json supplies this fallback on Vercel. See [deployment.md](deployment.md) for the accepted free-tier rollout and exact production configuration. The dev server already provides that fallback.
 
@@ -310,6 +310,6 @@ All **126 frontend tests**, typecheck, ESLint and build passed. Extended deferre
 
 ## Bounded season admin panel (2026-10-25)
 
-An admin-only Home entry opens `/seasons/:seasonId/admin`, reusing the season navigation, mobile spacing, dark cards and lime primary controls. Only the selected season's admins can load its operational metadata and controls. The [panel contract](season-admin-panel.md) documents one-step lifecycle confirmations, manual REVEAL-only visibility, durable visibility replay, read-only lifecycle recovery and account/season isolation. No results/preferences are queried.
+An admin-only Home entry opens `/seasons/:seasonId/admin`, reusing the season navigation, mobile spacing, dark cards and lime primary controls. Only the selected season's admins can load its operational metadata and controls. The [panel contract](season-admin-panel.md) documents one-step lifecycle confirmations, deliberate REVEAL publication, read-only lifecycle recovery and account/season isolation. No results/preferences are queried.
 
 All **241 frontend tests**, typecheck, ESLint and build passed; 39 new panel tests and five new API-boundary tests cover authorization, state/receipt validation, failures/reloads, journals and isolation. A synthetic in-memory browser preview verified Home entry, close → reveal → explicit open → hide, confirmation focus, and the 320/390 px mobile layouts with no browser errors. This was not a real Google/Cloud test; database contracts were unchanged and their suite was not rerun for this UI-only slice. Existing prior server verification remains recorded in [wrapped-results-server.md](wrapped-results-server.md).

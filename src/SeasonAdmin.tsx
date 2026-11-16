@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useAuth } from "./auth";
 import {
   uuidPattern,
   type AdminSeason,
   type Season,
-  type VisibilityAction,
 } from "./api";
 import { SeasonNavigation } from "./SeasonNavigation";
 import {
@@ -17,15 +16,11 @@ import {
   saveAdminPending,
   seasonStates,
   validateAdminSeason,
-  validateVisibilityReceipt,
-  visibilityRejected,
   type PendingAdmin,
 } from "./pendingAdmin";
 import type { AdminInvitation, AdminMember, AdminProgressRow, ImportPlan } from "./api";
 
-type Confirmation =
-  | { kind: "lifecycle"; from: Season["state"]; to: Season["state"] }
-  | { kind: "visibility"; visible: boolean };
+type Confirmation = { kind: "lifecycle"; from: Season["state"]; to: Season["state"] };
 const transitionLabels = {
   VOTING: "Open voting",
   LOCKED: "Close voting",
@@ -102,11 +97,9 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       const memberRows = memberResult.status === "fulfilled" ? memberResult.value : [];
       const invitationRows = invitationResult.status === "fulfilled" ? invitationResult.value : [];
       if (!active) return;
-      // Lifecycle has no replay contract. A successful authoritative read is
-      // its only recovery path, including after reload. Never resend it here.
-      for (const action of saved) {
-        if (action.kind === "lifecycle") removeAdminPending(action);
-      }
+      // Lifecycle and the retired visibility action have no replay contract.
+      // A successful authoritative read is the recovery path after reload.
+      for (const action of saved) removeAdminPending(action);
       setPending(readAdminPending(user, seasonId)[0] ?? null);
       setData(latest);
       const progressRows = progressResult.status === "fulfilled" ? (progressResult.value ?? []) : [];
@@ -159,36 +152,6 @@ function AdminSession({ seasonId }: { seasonId: string }) {
     setStatus("loading");
     setAttempt((n) => n + 1);
   }
-  async function sendVisibility(action: VisibilityAction) {
-    try {
-      const receipt = await api.setLoveVisibility(action);
-      validateVisibilityReceipt(receipt, action);
-      // Remove only after validating every receipt binding. Never use its
-      // historical visibility as current state, even on an ordinary success.
-      removeAdminPending(action);
-      reloadAfterWrite();
-    } catch (error) {
-      if (!mounted.current) return;
-      if (adminDenied(error)) {
-        setData(null);
-        setStatus("denied");
-      } else if (visibilityRejected(error)) {
-        try {
-          removeAdminPending(action);
-          setPending(null);
-          setStatus("error");
-        } catch {
-          setMessage(
-            "Browser storage is unavailable. Restore it, then retry the saved change.",
-          );
-        }
-      } else {
-        setMessage(
-          "We couldn’t confirm that visibility change. Retry the saved change before continuing.",
-        );
-      }
-    }
-  }
   async function submit() {
     if (
       working.current ||
@@ -199,7 +162,6 @@ function AdminSession({ seasonId }: { seasonId: string }) {
     )
       return;
     const selected = confirmation;
-    if (selected.kind === "visibility" && !data.canChange) return;
     if (
       selected.kind === "lifecycle" &&
       (selected.from !== data.state ||
@@ -227,24 +189,20 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       };
       saveAdminPending(action); // Failure here must prevent any server write.
       setPending(action);
-      if (action.kind === "visibility") {
-        await sendVisibility(action);
-      } else {
-        try {
-          const receipt = await api.transitionSeason(seasonId, user, action.to);
-          if (receipt !== action.to)
-            throw new Error("Invalid transition receipt");
-          reloadAfterWrite();
-        } catch (error) {
-          if (!mounted.current) return;
-          if (adminDenied(error)) {
-            setData(null);
-            setStatus("denied");
-          } else {
-            setMessage(
-              "We couldn’t confirm the season change. Refresh the season state before choosing another action.",
-            );
-          }
+      try {
+        const receipt = await api.transitionSeason(seasonId, user, action.to);
+        if (receipt !== action.to)
+          throw new Error("Invalid transition receipt");
+        reloadAfterWrite();
+      } catch (error) {
+        if (!mounted.current) return;
+        if (adminDenied(error)) {
+          setData(null);
+          setStatus("denied");
+        } else {
+          setMessage(
+            "We couldn’t confirm the season change. Refresh the season state before choosing another action.",
+          );
         }
       }
     } catch {
@@ -259,29 +217,11 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       if (mounted.current) setBusy(false);
     }
   }
-  async function retryVisibility() {
-    if (
-      working.current ||
-      status !== "ready" ||
-      !data?.canChange ||
-      pending?.kind !== "visibility"
-    )
-      return;
-    working.current = true;
-    setBusy(true);
-    await sendVisibility(pending);
-    working.current = false;
-    if (mounted.current) setBusy(false);
-  }
-
   const next = data && nextSeasonState(data.state);
   const disabled = busy || !!pending || !!confirmation;
-  const confirmLabel =
-    confirmation?.kind === "lifecycle"
-      ? transitionLabels[confirmation.to].toLowerCase()
-      : confirmation?.visible
-        ? "open love similarity"
-        : "hide love similarity";
+  const confirmLabel = confirmation
+    ? transitionLabels[confirmation.to].toLowerCase()
+    : "";
   async function invite() {
     const email = inviteEmail.trim();
     if (!email || !api.inviteMember) return;
@@ -357,7 +297,7 @@ function AdminSession({ seasonId }: { seasonId: string }) {
       {status === "ready" && data && (
         <>
           <div className="admin-heading-row">
-            <p>Manage the season stage and love-similarity visibility.</p>
+            <p>Manage the season stage and publish the season results.</p>
             <button onClick={refresh} disabled={busy || !!confirmation}>
               Refresh settings
             </button>
@@ -365,24 +305,13 @@ function AdminSession({ seasonId }: { seasonId: string }) {
           {pending && (
             <div className="notice" role="alert">
               <p>
-                {message ||
-                  (pending.kind === "visibility"
-                    ? !data.canChange
-                      ? "A visibility change is saved for this season. It cannot be retried before REVEAL. Refresh settings to check the season state."
-                      : `An unconfirmed change to ${pending.visible ? "open" : "hide"} love similarity is saved for this account and season. Retry it before making another change.`
-                    : "Check the current season state before making another change.")}
+                {message || "Check the current season state before making another change."}
               </p>
               <button
-                onClick={
-                  pending.kind === "visibility" ? retryVisibility : refresh
-                }
-                disabled={
-                  busy || (pending.kind === "visibility" && !data.canChange)
-                }
+                onClick={refresh}
+                disabled={busy}
               >
-                {pending.kind === "visibility"
-                  ? "Retry saved visibility change"
-                  : "Refresh season state"}
+                Refresh season state
               </button>
             </div>
           )}
@@ -416,34 +345,10 @@ function AdminSession({ seasonId }: { seasonId: string }) {
                 {transitionLabels[next]}
               </button>
             ) : (
-              <p>The season has reached REVEAL. Voting stays closed.</p>
+              <Link className="primary" to={`/seasons/${seasonId}/results`}>
+                See results
+              </Link>
             )}
-          </section>
-          <section className="admin-card" aria-labelledby="visibility-heading">
-            <h2 id="visibility-heading">Love similarity</h2>
-            <p>
-              Category visibility:{" "}
-              <strong>{data.visible ? "Open" : "Hidden"}</strong>
-            </p>
-            <p>
-              {data.canChange
-                ? "Open this category deliberately for members of this season."
-                : "Changes are available only after REVEAL. Entering REVEAL does not open this category."}
-            </p>
-            {data.visible && (
-              <p className="fine">
-                Hiding stops future reads. It cannot take back information
-                members have already seen.
-              </p>
-            )}
-            <button
-              disabled={disabled || !data.canChange}
-              onClick={() =>
-                choose({ kind: "visibility", visible: !data.visible })
-              }
-            >
-              {data.visible ? "Hide love similarity" : "Open love similarity"}
-            </button>
           </section>
           <section className="admin-card" aria-labelledby="members-heading">
             <h2 id="members-heading">Members</h2>
@@ -555,15 +460,11 @@ function AdminSession({ seasonId }: { seasonId: string }) {
             >
               <h2 id="admin-confirm-title">Confirm {confirmLabel}?</h2>
               <p>
-                {confirmation.kind === "visibility"
-                  ? confirmation.visible
-                    ? "Members of this season will be able to access love-similarity summaries."
-                    : "Future reads will be blocked. Information already delivered cannot be withdrawn."
-                  : confirmation.to === "LOCKED"
-                    ? "This closes voting for every member. It cannot be reopened. Results remain secret."
-                    : confirmation.to === "REVEAL"
-                      ? "This enters the final season stage. Love similarity stays hidden until you open it separately."
-                      : "Members of this season will be able to submit and edit their votes."}
+                {confirmation.to === "LOCKED"
+                  ? "This closes voting for every member. It cannot be reopened. Results remain secret."
+                  : confirmation.to === "REVEAL"
+                    ? "This publishes the season results. Love similarity will be available on the results page."
+                    : "Members of this season will be able to submit and edit their votes."}
               </p>
               <div className="admin-confirm-actions">
                 <button
