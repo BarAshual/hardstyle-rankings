@@ -51,7 +51,7 @@ RPC names and parameters below match SQL/PostgREST. Every caller's user ID comes
 | --- | --- |
 | `get_love_similarity_visibility(p_season)` | Same-season admin operational metadata; visibility equals REVEAL and `canChange` is always false. |
 | `set_love_similarity_visibility(p_season, p_visible, p_action)` | Retained compatibility boundary; new visibility mutations are rejected because REVEAL is the single publish action. See [full contract](wrapped-results-server.md). |
-| `get_love_similarity_results(p_season)` | Same-season member, REVEAL and explicitly visible category only; named unordered pair evidence, no raw ballots/audit. |
+| `get_love_similarity_results(p_season)` | Same-season member and REVEAL only; named unordered pair evidence, no raw ballots/audit. |
 | `create_season(p_name, p_year, p_allowance, p_nickname)` | Verified Google identity creates a SETUP season and becomes its first admin atomically; returns season UUID. Explicit nonnegative allowance is required. |
 | `invite_member(p_season, p_email)` | Season admin creates an invitation with trimmed/lowercase email; returns its UUID. Repeating the same normalized season/email returns the existing invitation. No delivery occurs. |
 | `inspect_invitation(p_invitation)` | Verified invited Google identity only; returns season ID/name/year and own existing nickname or null, without creating membership. |
