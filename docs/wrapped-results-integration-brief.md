@@ -15,18 +15,18 @@ The accepted control is for love similarity. Defaults for other future categorie
 
 ## Coordinate with the planned admin panel
 
-The results slice should supply a narrow category-setting/read contract for the shared season admin panel. Implement its controls in that panel's work, alongside the existing transition_season contract. If the panel is not present yet, document the integration point and leave the category hidden until the panel can deliberately open it. Do not create an independent results-only admin panel or auto-enable results as a workaround.
+The panel uses the admin-only operational metadata read and the existing `transition_season` contract. Entering REVEAL publishes Love similarity; at REVEAL the panel links to `/seasons/:seasonId/results`. The separate results branch implements that route.
 
-The panel can be accessible during earlier season states for authorized operational work and forward transitions. Its existence grants no pre-REVEAL preference preview. The visibility action should be unavailable before REVEAL in the UI and independently rejected at the server boundary. Existing administrative progress reads must retain their narrow projections.
+The panel can be accessible during earlier season states for authorized operational work and forward transitions. Its existence grants no pre-REVEAL preference preview. Existing administrative progress reads must retain their narrow projections.
 
 This document does not expand the panel's scope to invitations, catalog editing, exports, allowance changes, or other controls. Those features follow their own existing decisions and briefs.
 
-## Proposed engineering slice
+## Implemented engineering boundaries
 
 Inspect AGENTS.md, the existing source migrations/RPCs, the [architecture](architecture.md), [data model](data-model.md), [database contract](database-foundation.md), and the implemented calculation before coding. Preserve unrelated work.
 
-1. Design an additive, season-scoped category visibility setting, hidden when absent, with an admin-only audited change contract coordinated with existing season locking. Exact storage/API names remain engineering proposals. A hide action can be included in the on/off control; do not imply it can revoke information already delivered.
-2. Add a narrow result read that authorizes identity, membership, REVEAL, and open category before returning preference-derived data. Keep the raw-vote and vote-event RLS/grant contracts unchanged. Hiding a UI component is insufficient.
+1. Preserve the historical private category settings/events. The retired setter rejects mutations; operational metadata derives visibility from lifecycle and always reports `canChange=false`.
+2. Add a narrow result read that authorizes identity, membership, and REVEAL before returning preference-derived data. Keep the raw-vote and vote-event RLS/grant contracts unchanged. Hiding a UI component is insufficient.
 3. Prefer returning per-pair evidence counts and authorized season display names, rather than other members' ballots: co-rated count, loved intersection/union, and SL intersection/union. Use current votes and eligible canonical tracks from exactly the selected season.
 4. Reuse the approved TypeScript formula through a shared count-based calculation helper if needed; the current ballot calculator can delegate to it. Keep taste-love-v1 and its reference results unchanged. Do not duplicate formula coefficients in SQL or fetch everyone's raw votes into the browser to reuse the ballot function.
 5. Define a serializable result DTO. Undefined internal components need an explicit absent/null value and reason over JSON. Do not silently assign 0/100 or reweight 75/25 when a component is undefined.
@@ -43,12 +43,12 @@ The screen's layout, evidence presentation, and undefined-score copy still need 
 
 ## Acceptance and integration checks
 
-- Real local Postgres/Data API tests with synthetic seasons prove member and admin denial in SETUP/VOTING/LOCKED, denial while the category is hidden in REVEAL, and denial for outsiders and admins of another season.
-- In REVEAL, only a same-season admin can open the category; a transition to REVEAL alone leaves it hidden. Opening returns only the bounded output to same-season members. Category changes are audited and existing lifecycle sequencing/locks remain valid.
+- Real local Postgres/Data API tests with synthetic seasons prove member and admin denial in SETUP/VOTING/LOCKED, successful reads in REVEAL regardless of historical category settings, and denial for outsiders and admins of another season.
+- Only a same-season admin can advance lifecycle. REVEAL publishes bounded results to same-season members. Existing lifecycle audit, forward-only sequencing and locks remain valid; retired visibility actions never write or alter historical events.
 - A two-season/dummy-versus-official fixture proves no cross-season contribution. Neither endpoint nor client exposes raw ballots or audit events.
 - Count-based and ballot-based paths agree on the existing synthetic 1,200-track references, missing-vote handling, eligibility, undefined unions, and algorithm ID.
 - Results never enter ordinary catalog/progress reads, preference logs, public caches, or sanitized authorization errors.
 - When integrated with the panel, UI tests cover allowed lifecycle advances, REVEAL publication and the results link. When a result screen is implemented, test pre-REVEAL denial, loading, error, defined, and undefined states with evidence display.
 - Run required database integration checks for the new contract and npm test/typecheck/lint/build for TypeScript/UI changes. Review links/whitespace for docs. Preserve votes, immutable audit history, idempotency, integer versions, current RLS guarantees, and all unrelated edits; do not commit unless asked.
 
-The next implementation chat should take an explicitly bounded slice of this brief: server/category contract first, panel controls with the season-admin-panel work, and result presentation after its design is settled. The broader Wrapped scope remains desired.
+The next implementation chat should integrate the results page with the current server contract and the admin results link; see [closeout and handoff](admin-closeout.md). The broader Wrapped scope remains desired.

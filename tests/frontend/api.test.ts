@@ -187,8 +187,8 @@ describe("bounded season admin RPC adapter", () => {
       seasonId: "season",
       category: "love_similarity",
       state: "REVEAL",
-      canChange: true,
-      visible: false,
+      canChange: false,
+      visible: true,
     };
     const rpc = result(metadata);
     const query = {

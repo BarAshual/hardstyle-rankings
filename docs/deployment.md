@@ -10,8 +10,8 @@ The owner reports creating Supabase project `qlljthzktgrnpsnysnwq`, reaching Ver
 | --- | --- |
 | Supabase production project | `qlljthzktgrnpsnysnwq` |
 | Expected Supabase API URL | `https://qlljthzktgrnpsnysnwq.supabase.co` (verify in dashboard) |
-| Requested Vercel project name | `tiloz-ranking-2k26` |
-| Intended production origin | `https://tiloz-ranking-2k26.vercel.app` (availability and assignment unverified) |
+| Vercel project name | `hardstyle-rankings` |
+| Production origin | `https://tiloz-voting-2k26.vercel.app` (owner-confirmed browser login) |
 | First dummy season allowance | 50; this is not the official season allowance |
 | Production data | Clean slate; local votes are experiments and are not transferred |
 
@@ -114,7 +114,7 @@ For later releases: backup → compatible additive database change → verify �
 
 ## Catalog and dummy-season pilot
 
-The current importer intentionally rejects remote URLs. Do not bypass its target checks or load production tables directly. A separate bounded extension must add explicit HTTPS project allowlisting, visible target/season checks, separated protected sessions, and hosted authorization/retry validation. Keep Google-admin JWT RPCs and Spotify PKCE; no service-role import path.
+The bounded dummy-pilot extension now requires explicit HTTPS project/season binding, separated protected Google sessions and fresh target-bound plans; local-only operation remains the default. See the Cloud pilot section in [spotify-importer.md](spotify-importer.md). The first hosted Google-admin plan/apply and fresh-plan repeat passed as recorded below; broader multi-user and recovery validation remain pending. Keep Google-admin JWT RPCs and Spotify PKCE; no service-role import path or direct table loading.
 
 After that extension and recovery readiness: designate the production source, create a fresh target-bound plan, review exceptions, apply, reconcile receipts, and repeat to verify no unintended additions. Planning itself writes private import bookkeeping. No local plan or review file is authoritative for new production UUIDs.
 
@@ -136,7 +136,48 @@ Start monitoring with platform logs and operational metrics. Never record choice
 
 - Prepared locally: Vercel routing/build configuration and this operating guide.
 - Owner-reported: empty Cloud project, Vercel import screen, new Google Cloud project.
-- Not yet verified: hosted migrations/configuration, stable domain, Google handshake/claims, catalog import, pilot, backup automation and restore.
+- Verified on 2026-10-11: correct Cloud project, PostgreSQL 17.11, initial empty state, all ten migration versions, and the schema/security checks below.
+- Owner browser evidence: Google login returns to `https://tiloz-voting-2k26.vercel.app` and displays the signed-in membership gate. Verified in Cloud: the creator has a confirmed matching verified Google identity.
+- Not yet fully verified: Cloud Auth/API configuration, multi-user admission/secrecy, catalog import, pilot, backup automation and restore.
 - Official voting remains gated on these validations and a selected official allowance.
 
 Official references: [Vite on Vercel](https://vercel.com/docs/frameworks/frontend/vite), [Vercel environment variables](https://vercel.com/docs/environment-variables), [Supabase Google OAuth](https://supabase.com/docs/guides/auth/social-login/auth-google), [Supabase migration workflow](https://supabase.com/docs/guides/deployment/database-migrations), [backup and restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore), [backup coverage](https://supabase.com/docs/guides/platform/backups), and [current free limits](https://supabase.com/pricing).
+
+## Cloud schema initialization checkpoint (2026-10-11)
+
+After the owner completed interactive CLI login, the target project was verified ACTIVE_HEALTHY in eu-central-1 with PostgreSQL 17.11. Preflight returned zero public/private app tables and zero Auth users; no migration history existed. GitHub quality gate for commit 5e7af8fca41bb1513bc78116a65a60cef3ba452e passed frontend and disposable database/importer jobs.
+
+A separate migration-only workspace copied all ten SQL files byte-for-byte from that commit, with seed disabled and no credentials or seed file. Explicit-project dry run showed exactly those migrations and no seeds. All ten were applied using --skip-vault; remote migration history then matched every local version. The regular local Supabase project was not reset, linked to Cloud, or modified.
+
+Hosted catalog checks verified 11 public and 8 private application tables, RLS on all 19, no authenticated direct table-write privileges, no anonymous table reads, no anon/authenticated/service-role table access to private importer tables, and empty pinned search paths for security-definer functions. cast_vote is executable by authenticated and not anon. Both deferred vote/audit consistency triggers and all five immutable audit triggers are enabled. Own-vote and own-event policies require auth.uid ownership and membership; neither preference table has a publication. The season nickname unique index and six vote constraints are present. Auth users, seasons and catalog tracks remain zero.
+
+These are structural checks on an empty hosted database, not end-to-end Google admission, hosted multi-user vote/concurrency tests, backup or restore validation. Cloud provider/API settings remain a separate verification step; official voting remains gated.
+
+## First production dummy season (2026-10-11)
+
+The owner authorized provisioning after completing Google login. The operator checked the exact production project and confirmed no existing seasons, then used the documented owner provisioning boundary: a transaction-local authenticated identity context and the existing `create_season` function, without direct table inserts or privileged browser credentials.
+
+Created `DUMMY — Production Pilot 2026` (season UUID `40e56921-f6a2-45c6-a54e-d619600a52de`), year 2026, allowance 50 Super Likes per member, in SETUP. The creator is the first admin with nickname `Tiloz`. Post-commit checks confirmed one member, correct creator/admin linkage, allowance 50 and zero tracks. No lifecycle transition or preference access was performed. Two email-bound pilot invitations were created through `invite_member` for the owner-provided accounts; both await acceptance. Links were returned privately to the owner; no messages were sent. Catalog preparation, hosted pilot and recovery gates remain outstanding.
+
+
+## Dummy pilot catalog and voting checkpoint (2026-10-11)
+
+The owner supplied a Spotify playlist and explicitly approved its first 20 release-year exceptions for dummy use. The bounded Cloud operator extension passed all 14 mocked importer tests and then completed a fresh Google PKCE login, audited source designation, hosted full scan/plan and exception review. Initial limited apply created 20 canonical tracks, 12 artists, 20 provider mappings and 20 active memberships. Fresh-plan limited repeat returned 20 already-present outcomes with zero additions. The remaining 16 playlist occurrences remain unapplied. Hosted authenticated reads confirmed all 20 active tracks; anonymous season reads and importer context were denied. No operator vote writes or preference reads occurred.
+
+The dummy season is now VOTING, allowance 50, with exactly one attributed SETUP → VOTING lifecycle event verified through the authenticated Data API. The earlier SETUP checkpoint remains historical. The owner and the two invitees can begin the dummy-only browser pilot. This milestone does not establish multi-user vote durability/secrecy, restore readiness or permission to invite everyone for official voting. Code and synchronized documentation remain uncommitted pending explicit owner instruction.
+
+
+## Manual Apple listening-link enrichment (2026-10-11)
+
+The owner supplied an Apple Music IL playlist and requested manual links for the 20 admitted dummy tracks. All 20 were individually reviewed against provider titles/version labels, ordered artist credits and displayed durations (less than one second difference). Two matching version labels use parentheses on Apple instead of a Spotify title separator; casing differences do not change the reviewed recording. Playlist order alone was not used as identity evidence.
+
+A one-off owner transaction acquired the existing catalog advisory lock and the dummy season row lock, checked VOTING/admin membership, exact Spotify mapping/track/title/membership identity, absence of cross-season scope, and refusal to overwrite or repoint a different existing link/mapping. It added 20 `apple_music` mappings in `private.track_providers`, with retained public source/storefront/artist/duration evidence, reviewer UUID and timestamp, and selected their `tracks.apple_music_url` display projections. Existing canonical metadata excluding that URL was checked equal before commit. No vote or vote-event table was read or written; no artist mapping, membership or identity reassignment occurred.
+
+Post-commit authenticated hosted catalog reads returned all 20 expected Apple song URLs. The frontend already consumes this field, so no frontend release or migration was needed. The protected review manifest and transaction file are operator artifacts, not credentials or committed fixtures. This is bounded manual enrichment under the accepted owner trust boundary, not an Apple API adapter, automated matching system or reusable administration UI. Recovery and multi-user pilot gates remain unchanged.
+
+
+## Explicit owner test-vote reset (2026-10-11)
+
+The owner explicitly requested direct deletion of their own dummy-season votes and reiterated that this Cloud season is test data. This is a one-off destructive test-data exception, not a product undo/reset feature or a change to official vote durability/retention guarantees. Preflight identified 19 current votes and 21 audit/replay events for only the creator in the first production dummy season.
+
+The owner transaction used the actor advisory lock, NOWAIT exclusive vote/event table locks and a guarded dummy-season lock. It temporarily disabled only the immutable vote-event trigger inside that transaction, deleted the exact season/user event rows then current vote rows, and re-enabled the trigger before commit. Guards checked unchanged out-of-scope row counts and enabled audit protections. Post-commit verification confirmed zero target votes/events, all three vote/audit guards enabled, and all 20 Apple-linked active catalog tracks retained. No choices were printed, no other user's votes were deleted, and no migration or application reset endpoint was introduced. Historical pilot voting observations predate this deliberate reset. Refresh browser views before rating again; old accepted-action replay history for this user's dummy votes was deliberately removed at the owner's request.

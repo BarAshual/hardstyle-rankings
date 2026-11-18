@@ -40,8 +40,8 @@ function fake(state: Season["state"] = "REVEAL") {
     name: "Synthetic 2026",
     state,
     category: "love_similarity",
-    visible: false,
-    canChange: state === "REVEAL",
+    visible: state === "REVEAL",
+    canChange: false,
   };
   let listener: (identity: Identity | null) => void = () => {};
   const api = {
@@ -82,7 +82,7 @@ function fake(state: Season["state"] = "REVEAL") {
       .fn<API["transitionSeason"]>()
       .mockImplementation(async (_s, _u, next) => {
         metadata.state = next;
-        metadata.canChange = next === "REVEAL";
+        metadata.visible = next === "REVEAL";
         return next;
       }),
   } satisfies API;
@@ -225,6 +225,9 @@ describe("season admin access and operational metadata", () => {
   it.each([
     { seasonId: otherSid },
     { state: "BOGUS" },
+    { visible: false },
+    { canChange: true },
+    { category: "other" },
     { name: "" },
   ])("blocks malformed operational metadata %j", async (invalid) => {
     const { api, metadata } = fake();
@@ -241,7 +244,7 @@ describe("season admin access and operational metadata", () => {
 });
 
 describe("deliberate lifecycle changes and read-only recovery", () => {
-  it("confirms every one-step advance, permits cancellation and leaves REVEAL hidden", async () => {
+  it("confirms every one-step advance, permits cancellation and publishes at REVEAL", async () => {
     const { api } = fake("SETUP");
     mount(api);
     await ready();
@@ -337,314 +340,6 @@ describe("deliberate lifecycle changes and read-only recovery", () => {
   });
 });
 
-/* Retired visibility-action UI tests: REVEAL is now the single publish moment.
-describe("visibility receipt, reload and failure recovery", () => {
-  it.each(["SETUP", "VOTING", "LOCKED"] as const)(
-    "cannot retry saved visibility intent before REVEAL (%s)",
-    async (state) => {
-      const saved = action();
-      saveAdminPending(saved);
-      const { api } = fake(state);
-      mount(api);
-      await ready();
-      expect(
-        screen.getByRole("button", { name: "Retry saved visibility change" }),
-      ).toBeDisabled();
-      expect(
-        screen.getByRole("button", { name: "Open love similarity" }),
-      ).toBeDisabled();
-      expect(api.setLoveVisibility).not.toHaveBeenCalled();
-      expect(readAdminPending(uid, sid)).toEqual([saved]);
-    },
-  );
-  it("saves intent before sending, confirms open/hide and refreshes authoritative metadata", async () => {
-    const { api, metadata } = fake();
-    api.setLoveVisibility.mockImplementation(async (a) => {
-      expect(readAdminPending(uid, sid)).toEqual([a]);
-      metadata.visible = a.visible;
-      return receipt(a);
-    });
-    mount(api);
-    await ready();
-    await confirm("Open love similarity");
-    await ready();
-    expect(
-      screen.getByText("Open", { selector: "strong" }),
-    ).toBeInTheDocument();
-    await confirm("Hide love similarity");
-    await ready();
-    expect(
-      screen.getByText("Hidden", { selector: "strong" }),
-    ).toBeInTheDocument();
-    const [first, second] = api.setLoveVisibility.mock.calls.map(([a]) => a);
-    expect(first.actionId).not.toBe(second.actionId);
-    expect(api.adminSeason).toHaveBeenCalledTimes(3);
-    expect(readAdminPending(uid, sid)).toEqual([]);
-  });
-  it("replays exactly after reload and ignores a historical receipt's visibility", async () => {
-    const { api } = fake();
-    api.setLoveVisibility.mockRejectedValueOnce(new Error("lost response"));
-    const view = mount(api);
-    await ready();
-    await confirm("Open love similarity");
-    await screen.findByRole("button", {
-      name: "Retry saved visibility change",
-    });
-    const original = api.setLoveVisibility.mock.calls[0][0];
-    expect(readAdminPending(uid, sid)).toEqual([original]);
-    view.unmount();
-    api.setLoveVisibility.mockImplementation(async (a) => receipt(a)); // Another admin already hid it.
-    mount(api);
-    await ready();
-    expect(api.setLoveVisibility).toHaveBeenCalledOnce(); // No auto replay on load.
-    expect(
-      screen.getByRole("button", { name: "Open love similarity" }),
-    ).toBeDisabled();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Retry saved visibility change" }),
-    );
-    await ready();
-    expect(api.setLoveVisibility).toHaveBeenLastCalledWith(original);
-    expect(readAdminPending(uid, sid)).toEqual([]);
-    expect(
-      screen.getByText("Hidden", { selector: "strong" }),
-    ).toBeInTheDocument();
-  });
-  it.each([
-    { actionId: "other" },
-    { seasonId: otherSid },
-    { visible: false },
-    { category: "other" },
-    { changedAt: "invalid" },
-    { changedAt: null },
-  ])(
-    "retains the exact action after mismatched receipt %j",
-    async (invalid) => {
-      const { api } = fake();
-      api.setLoveVisibility.mockImplementation(async (a) => ({
-        ...receipt(a),
-        ...invalid,
-      }));
-      mount(api);
-      await ready();
-      await confirm("Open love similarity");
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "couldn’t confirm",
-      );
-      const original = api.setLoveVisibility.mock.calls[0][0];
-      expect(readAdminPending(uid, sid)).toEqual([original]);
-      expect(
-        screen.getByRole("button", { name: "Open love similarity" }),
-      ).toBeDisabled();
-      api.setLoveVisibility.mockImplementation(async (a) => receipt(a));
-      await userEvent.click(
-        screen.getByRole("button", { name: "Retry saved visibility change" }),
-      );
-      await ready();
-      expect(api.setLoveVisibility).toHaveBeenLastCalledWith(original);
-    },
-  );
-  it("retries only the read when refresh fails after a valid receipt", async () => {
-    const { api } = fake();
-    mount(api);
-    await ready();
-    api.adminSeason.mockRejectedValueOnce(new Error("refresh offline"));
-    await confirm("Open love similarity");
-    await screen.findByRole("button", { name: "Try again" });
-    expect(readAdminPending(uid, sid)).toEqual([]);
-    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await ready();
-    expect(api.setLoveVisibility).toHaveBeenCalledOnce();
-  });
-  it("blocks writes when journal persistence fails and allows recovery after storage returns", async () => {
-    const { api } = fake();
-    mount(api);
-    await ready();
-    const store = vi
-      .spyOn(Storage.prototype, "setItem")
-      .mockImplementation(() => {
-        throw new Error("quota");
-      });
-    try {
-      await confirm("Open love similarity");
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "browser storage",
-      );
-      expect(api.setLoveVisibility).not.toHaveBeenCalled();
-    } finally {
-      store.mockRestore();
-    }
-    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await ready();
-    await confirm("Open love similarity");
-    await ready();
-    expect(api.setLoveVisibility).toHaveBeenCalledOnce();
-  });
-  it("retains the request if receipt cleanup fails and retries with the same UUID", async () => {
-    const { api } = fake();
-    mount(api);
-    await ready();
-    const remove = vi
-      .spyOn(Storage.prototype, "removeItem")
-      .mockImplementation(() => {
-        throw new Error("blocked");
-      });
-    try {
-      await confirm("Open love similarity");
-      await screen.findByRole("alert");
-    } finally {
-      remove.mockRestore();
-    }
-    const original = api.setLoveVisibility.mock.calls[0][0];
-    expect(readAdminPending(uid, sid)).toEqual([original]);
-    await userEvent.click(
-      screen.getByRole("button", { name: "Retry saved visibility change" }),
-    );
-    await ready();
-    expect(api.setLoveVisibility).toHaveBeenLastCalledWith(original);
-  });
-  it("blocks corrupt saved intent instead of silently discarding it", async () => {
-    const { api } = fake();
-    localStorage.setItem(
-      adminScope(uid, sid) + crypto.randomUUID(),
-      "broken JSON",
-    );
-    mount(api);
-    await screen.findByRole("alert");
-    expect(api.setLoveVisibility).not.toHaveBeenCalled();
-    expect(
-      screen.queryByRole("heading", { name: "Love similarity" }),
-    ).not.toBeInTheDocument();
-  });
-  it("refreshes after a definitive rejection without resending that request", async () => {
-    const { api } = fake();
-    api.setLoveVisibility.mockRejectedValueOnce({
-      message: "action_payload_conflict",
-      code: "P0001",
-    });
-    mount(api);
-    await ready();
-    await confirm("Open love similarity");
-    await screen.findByRole("button", { name: "Try again" });
-    expect(readAdminPending(uid, sid)).toEqual([]);
-    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await ready();
-    expect(api.setLoveVisibility).toHaveBeenCalledOnce();
-  });
-}); */
-
-/*
-describe("account and season isolation", () => {
-  it("ignores an old account's in-flight read and reauthorizes the new account", async () => {
-    const { api, metadata, notify } = fake();
-    const oldRead = deferred<AdminSeason>();
-    api.adminSeason
-      .mockReturnValueOnce(oldRead.promise)
-      .mockRejectedValue({ message: "season_admin_required", code: "42501" });
-    mount(api);
-    await waitFor(() => expect(api.adminSeason).toHaveBeenCalledWith(sid, uid));
-    act(() => notify({ id: otherUid }));
-    await screen.findByRole("alert");
-    await act(async () => oldRead.resolve(metadata));
-    expect(api.adminSeason).toHaveBeenLastCalledWith(sid, otherUid);
-    expect(
-      screen.queryByRole("heading", { name: "Love similarity" }),
-    ).not.toBeInTheDocument();
-  });
-  it("keeps an uncertain write with its original account, including late responses", async () => {
-    const { api, notify } = fake();
-    const write = deferred<unknown>();
-    api.setLoveVisibility.mockReturnValueOnce(write.promise);
-    mount(api);
-    await ready();
-    await confirm("Open love similarity");
-    const original = api.setLoveVisibility.mock.calls[0][0];
-    act(() => notify({ id: otherUid }));
-    await ready();
-    await act(async () => write.reject(new Error("late error")));
-    expect(
-      screen.queryByRole("button", { name: "Retry saved visibility change" }),
-    ).not.toBeInTheDocument();
-    expect(readAdminPending(uid, sid)).toEqual([original]);
-    expect(readAdminPending(otherUid, sid)).toEqual([]);
-    act(() => notify({ id: uid }));
-    await ready();
-    expect(
-      screen.getByRole("button", { name: "Retry saved visibility change" }),
-    ).toBeEnabled();
-    expect(api.setLoveVisibility).toHaveBeenCalledOnce();
-  });
-  it("resets confirmation and saved actions on season navigation and ignores late reads", async () => {
-    const { api, metadata } = fake();
-    const saved = action();
-    saveAdminPending(saved);
-    const firstRead = deferred<AdminSeason>();
-    api.adminSeason.mockReturnValueOnce(firstRead.promise);
-    mount(api);
-    await waitFor(() => expect(api.adminSeason).toHaveBeenCalledOnce());
-    await userEvent.click(screen.getByRole("button", { name: "Other season" }));
-    await ready();
-    await act(async () =>
-      firstRead.resolve({ ...metadata, name: "Wrong season name" }),
-    );
-    expect(screen.queryByText("Wrong season name")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Retry saved visibility change" }),
-    ).not.toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Open love similarity" }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "First season" }));
-    await ready();
-    expect(
-      screen.queryByRole("button", { name: "Confirm open love similarity" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Retry saved visibility change" }),
-    ).toBeEnabled();
-    expect(readAdminPending(uid, sid)).toEqual([saved]);
-    expect(api.setLoveVisibility).not.toHaveBeenCalled();
-  });
-  it("removes controls on server denial while preserving the saved action", async () => {
-    const { api } = fake();
-    api.setLoveVisibility.mockRejectedValue({
-      message: "season_admin_required",
-      code: "42501",
-    });
-    mount(api);
-    await ready();
-    await confirm("Open love similarity");
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "aren’t available",
-    );
-    expect(
-      screen.queryByRole("heading", { name: "Love similarity" }),
-    ).not.toBeInTheDocument();
-    expect(readAdminPending(uid, sid)).toHaveLength(1);
-  });
-  it("preserves multiple per-action records and never consumes another scope", async () => {
-    const first = action(),
-      second = action(),
-      foreign = { ...action(), userId: otherUid, seasonId: otherSid };
-    saveAdminPending(first);
-    saveAdminPending(second);
-    saveAdminPending(foreign);
-    const { api } = fake();
-    mount(api);
-    await ready();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Retry saved visibility change" }),
-    );
-    await ready();
-    expect(readAdminPending(uid, sid)).toHaveLength(1);
-    expect(readAdminPending(otherUid, otherSid)).toEqual([foreign]);
-    expect(
-      screen.getByRole("button", { name: "Hide love similarity" }),
-    ).toBeDisabled();
-  });
-});
-*/
-
 describe("account and season isolation", () => {
   it("does not expose the admin route after account authorization changes", async () => {
     const { api, metadata, notify } = fake();
@@ -657,5 +352,104 @@ describe("account and season isolation", () => {
     await act(async () => oldRead.resolve(metadata));
     expect(api.adminSeason).toHaveBeenLastCalledWith(sid, otherUid);
     expect(screen.queryByRole("link", { name: "See results" })).not.toBeInTheDocument();
+  });
+});
+
+describe("lifecycle recovery journals", () => {
+  const marker = () => ({
+    kind: "lifecycle" as const, userId: uid, seasonId: sid,
+    actionId: crypto.randomUUID(), from: "VOTING" as const, to: "LOCKED" as const,
+  });
+  it("discards retired visibility intent only after an authorized read, never replays it", async () => {
+    saveAdminPending({ kind: "visibility", userId: uid, seasonId: sid, actionId: crypto.randomUUID(), visible: false });
+    const foreign = { ...marker(), userId: otherUid, seasonId: otherSid };
+    saveAdminPending(foreign);
+    const { api } = fake();
+    api.adminSeason.mockRejectedValueOnce(new Error("offline"));
+    mount(api);
+    await screen.findByRole("alert");
+    expect(readAdminPending(uid, sid)).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await ready();
+    expect(readAdminPending(uid, sid)).toEqual([]);
+    expect(readAdminPending(otherUid, otherSid)).toEqual([foreign]);
+    expect(api.setLoveVisibility).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "See results" })).toHaveAttribute("href", `/seasons/${sid}/results`);
+  });
+  it("keeps an uncertain lifecycle write in its original account and recovers with reads only", async () => {
+    const { api, notify } = fake("VOTING");
+    const write = deferred<unknown>();
+    api.transitionSeason.mockReturnValueOnce(write.promise);
+    mount(api);
+    await ready();
+    await confirm("Close voting");
+    const saved = readAdminPending(uid, sid);
+    expect(saved).toHaveLength(1);
+    act(() => notify({ id: otherUid }));
+    await ready();
+    await act(async () => write.reject(new Error("late response")));
+    expect(readAdminPending(uid, sid)).toEqual(saved);
+    expect(readAdminPending(otherUid, sid)).toEqual([]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    act(() => notify({ id: uid }));
+    await ready();
+    expect(readAdminPending(uid, sid)).toEqual([]);
+    expect(api.transitionSeason).toHaveBeenCalledOnce();
+  });
+  it("ignores late season reads and clears confirmation when navigating seasons", async () => {
+    const { api, metadata } = fake("VOTING");
+    const first = deferred<AdminSeason>();
+    api.adminSeason.mockReturnValueOnce(first.promise);
+    mount(api);
+    await waitFor(() => expect(api.adminSeason).toHaveBeenCalledOnce());
+    await userEvent.click(screen.getByRole("button", { name: "Other season" }));
+    await ready();
+    await act(async () => first.resolve({ ...metadata, name: "Stale season" }));
+    expect(screen.queryByText("Stale season")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close voting" }));
+    await userEvent.click(screen.getByRole("button", { name: "First season" }));
+    await ready();
+    expect(screen.queryByRole("button", { name: "Confirm close voting" })).not.toBeInTheDocument();
+    expect(api.transitionSeason).not.toHaveBeenCalled();
+  });
+  it("prevents writes if storage fails and can recover after storage returns", async () => {
+    const { api } = fake("VOTING");
+    mount(api);
+    await ready();
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
+    try {
+      await confirm("Close voting");
+      expect(await screen.findByRole("alert")).toHaveTextContent("browser storage");
+      expect(api.transitionSeason).not.toHaveBeenCalled();
+    } finally { spy.mockRestore(); }
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await ready();
+    await confirm("Close voting");
+    await ready();
+    expect(api.transitionSeason).toHaveBeenCalledOnce();
+  });
+  it("blocks corrupt journals without discarding them", async () => {
+    const { api } = fake();
+    const key = adminScope(uid, sid) + crypto.randomUUID();
+    localStorage.setItem(key, "broken");
+    mount(api);
+    await screen.findByRole("alert");
+    expect(localStorage.getItem(key)).toBe("broken");
+    expect(api.transitionSeason).not.toHaveBeenCalled();
+  });
+  it("retains a lifecycle marker when cleanup fails, then recovers without resubmitting", async () => {
+    const { api } = fake("VOTING");
+    mount(api);
+    await ready();
+    const spy = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("blocked"); });
+    try {
+      await confirm("Close voting");
+      await screen.findByRole("alert");
+      expect(readAdminPending(uid, sid)).toHaveLength(1);
+    } finally { spy.mockRestore(); }
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await ready();
+    expect(readAdminPending(uid, sid)).toEqual([]);
+    expect(api.transitionSeason).toHaveBeenCalledOnce();
   });
 });

@@ -1,19 +1,19 @@
 # Love similarity server contract
 
-2026-10-25. Implemented locally as planned below; no deployment. Concrete engineering plan recorded before the additive migration; implements the approved policy in [the integration brief](wrapped-results-integration-brief.md) and D49–D52 in [decisions.md](decisions.md). Names, storage, and DTOs below are implementation choices, not additional product decisions.
+Initially implemented 2026-10-25; revised for unified REVEAL on 2026-11-16 and verified in the [2026-11-17 closeout](admin-closeout.md). Concrete engineering plan recorded before the additive migration; implements the approved policy in [the integration brief](wrapped-results-integration-brief.md) and D49–D52 in [decisions.md](decisions.md). Names, storage, and DTOs below are implementation choices, not additional product decisions.
 
 ## Approved boundaries
 
 Love similarity is unavailable before REVEAL and becomes readable to same-season members when the admin deliberately enters REVEAL. There is no separate category-opening gate. Preserve `taste-love-v1`, the 75/25 formula, undefined components, raw-vote/audit privacy, and existing voting/lifecycle contracts. Admin-panel presentation, result screens, awards, thresholds, other categories and other formulas are outside this slice.
 
-## Schema and RPC plan
+## Current schema and RPC contract
 
-- Add private `season_result_categories`, keyed by `(season_id, category)` with only `love_similarity` accepted, `visible` default false. An absent row is hidden. No seeded openings or changes to existing tables, policies, votes, or lifecycle RPCs.
-- Add private append-only `season_result_category_events`, retaining actor/action UUID, season/category, old/new visibility, and timestamp. Restrictive foreign keys, RLS, explicit denial of client table privileges, and existing immutable-event triggers protect both tables/history. Neither table is exposed by the Data API.
-- `get_love_similarity_visibility(p_season)` returns admin-only `{seasonId, category, visible, state, canChange}`. It is available in every state for the planned panel and contains no preferences or audit history.
+- Preserve private `season_result_categories` and its old boolean settings as historical data. Neither an absent row nor a historical hidden setting blocks authorized results after REVEAL.
+- Preserve private append-only `season_result_category_events`, retaining actor/action UUID, season/category, old/new visibility, and timestamp. Restrictive foreign keys, RLS, explicit denial of client table privileges, and existing immutable-event triggers protect both tables/history. Neither table is exposed by the Data API.
+- `get_love_similarity_visibility(p_season)` returns admin-only `{seasonId, category, visible, state, canChange}`. It is available in every state and contains no preferences or audit history. `visible` is exactly `state === 'REVEAL'`; `canChange` is always false. Clients must validate this current contract.
 - The historical `set_love_similarity_visibility` RPC is retained only as a compatibility boundary and now rejects new visibility mutations with `result_visibility_control_removed`; existing category/event rows remain immutable historical data.
 - `get_love_similarity_results(p_season)` authenticates, verifies membership, acquires the season row lock shared with lifecycle operations, then requires REVEAL. It returns one JSON object `{seasonId, algorithm: "taste-love-v1", pairs: [...]}` to avoid Data API row-limit truncation. Each unordered member pair appears once in UUID order, including zero-evidence pairs; fewer than two members yields `[]`.
-- Each pair contains `first` and `second` `{memberId, nickname}` plus `coRatedCount`, `loveIntersectionCount`, `loveUnionCount`, `slIntersectionCount`, `slUnionCount`. Count only current votes from exactly that season on active canonical season tracks rated by both members. No choices, track IDs, audit events, emails, or totals from another season are returned. SQL contains no formula coefficients. Reads and setters require READ COMMITTED so waiting transactions observe the committed visibility/lifecycle state.
+- Each pair contains `first` and `second` `{memberId, nickname}` plus `coRatedCount`, `loveIntersectionCount`, `loveUnionCount`, `slIntersectionCount`, `slUnionCount`. Count only current votes from exactly that season on active canonical season tracks rated by both members. No choices, track IDs, audit events, emails, or totals from another season are returned. SQL contains no formula coefficients. Both read RPCs require READ COMMITTED; results reads wait on the season lock and observe the committed lifecycle state. The retired setter rejects valid authorized requests at any isolation level without writing.
 - Errors are sanitized: existing identity/admin/membership errors; `results_not_available` for pre-REVEAL reads; `result_visibility_control_removed` for retired visibility mutations; `invalid_result_visibility_payload` and `read_committed_required` for their named contracts. Set result RPC response headers to `Cache-Control: no-store` to prevent public caching; do not log returned preferences.
 
 ## Shared calculation and integration
@@ -24,7 +24,7 @@ The season admin panel uses the existing `transition_season` RPC and links to th
 
 ## Verification plan
 
-Run a fresh isolated local Supabase project with only repository migrations and synthetic seed identities; never reset or query an existing voting project. Add real SQL-role and Data API tests for all pre-REVEAL states, hidden REVEAL, same-season admin authority, outsider/anonymous denial, cross-season isolation using shared canonical tracks, eligibility/current edits/missing choices, exact output projections, audit immutability/atomicity, idempotent retries and lock races. Retain the full existing database regression suite. Extend TypeScript tests to compare count and ballot paths on the 1,200-track references and undefined cases, then run `npm test`, typecheck, lint, build, database lint, and documentation link/whitespace checks.
+Run a fresh isolated local Supabase project with only repository migrations and synthetic seed identities; never reset or query an existing voting project. Add real SQL-role and Data API tests for all pre-REVEAL states, successful REVEAL even with historical hidden settings, same-season admin authority, outsider/anonymous denial, cross-season isolation using shared canonical tracks, eligibility/current edits/missing choices, exact output projections, audit immutability/atomicity, idempotent retries and lock races. Retain the full existing database regression suite. Extend TypeScript tests to compare count and ballot paths on the 1,200-track references and undefined cases, then run `npm test`, typecheck, lint, build, database lint, and documentation link/whitespace checks.
 
 
 ## Concrete integration calls and JSON handling
@@ -34,10 +34,7 @@ Use authenticated `POST /rest/v1/rpc/<name>` (or `supabase.rpc`) for all three R
 ```ts
 // Planned panel: operational metadata only, even before REVEAL.
 await supabase.rpc("get_love_similarity_visibility", { p_season: seasonId });
-// Retained compatibility endpoint; new visibility mutations are rejected.
-await supabase.rpc("set_love_similarity_visibility", {
-  p_season: seasonId, p_visible: true, p_action: actionId,
-});
+// Do not call the retired visibility setter.
 // Planned result screen: only this authorized count response reaches the helper.
 const { data, error } = await supabase.rpc("get_love_similarity_results", {
   p_season: seasonId,
@@ -53,7 +50,9 @@ Read failures use SQLSTATE 42501 for missing identity/membership or unavailable 
 The season admin panel uses the existing lifecycle transition and links to the results route after REVEAL. The result screen still needs layout/copy design and tests for denied/pre-REVEAL, loading, error, defined/undefined values and evidence; keep returned data scoped to the signed-in user/season and avoid persistent preference caches or logs. This server slice introduced no controls, screen, thresholds, awards or extra formulas.
 
 
-## Local verification (2026-10-25)
+## Historical local verification (2026-10-25)
+
+These results describe the original separate-toggle milestone. Current verification is recorded in [admin closeout](admin-closeout.md).
 
 The additive migration applied successfully to a newly created disposable local Supabase project, `hardstyle-results-server` (API 56421, database 56422), using only repository migrations and synthetic seed identities. Existing local/Cloud voting projects and real ballots were not queried or modified. The stack was stopped after verification.
 
@@ -62,4 +61,4 @@ The additive migration applied successfully to a newly created disposable local 
 - `npm test`: **197 tests passed**, including count/ballot reference equivalence and JSON null/reason handling. `npm run typecheck`, `npm run lint`, and `npm run build` passed.
 - Checks ran from a temporary copy without repository environment files, using installed local dependencies; original source and test files matched that copy. Documentation relative links, whitespace and Python syntax checks passed.
 
-The additive migration was applied to the isolated preview database for integration verification; no production deployment or real voting data was accessed. No season is opened by applying it. The [bounded admin panel](season-admin-panel.md) completes control integration; result-screen integration/testing remain as described above.
+The additive migration was applied to the isolated preview database for integration verification; no production deployment or real voting data was accessed. Applying the unified-REVEAL migration makes Love similarity available for seasons already in REVEAL; it never advances a season or exposes pre-REVEAL results. The [bounded admin panel](season-admin-panel.md) completes control integration; result-screen integration/testing remain as described above.

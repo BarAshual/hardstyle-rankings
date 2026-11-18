@@ -55,7 +55,7 @@ There are no remaining product decisions blocking this database foundation. Prod
 - Super Like season configuration remains explicit rather than a hard-coded product default. The working choice for the official 2026 season is 40 per member; see the accepted results planning below. Existing pilot/dummy allowances are not changed.
 - Destructive catalog edits, merging/deduplication of voted tracks, retention, and account deletion: the foundation exposes no destructive operations and preserves history; final policy is deferred.
 - Broader nickname rules, hosting, import/enrichment integrations, and production backup/restore operations. Production recovery is not a blocker to local foundation work, but must be defined and verified before real voting data is collected.
-- Song-scoring formulas, artist aggregation, shared-PASS and overall similarity, defaults for additional result categories, party sequence, unrestricted post-reveal individual-vote access, and exceptional lifecycle corrections remain open. Song tie policy, love similarity v1, and its manual category-opening policy were selected in the accepted results planning below.
+- Song-scoring formulas, artist aggregation, shared-PASS and overall similarity, defaults for additional result categories, party sequence, unrestricted post-reveal individual-vote access, and exceptional lifecycle corrections remain open. Song tie policy, love similarity v1, and its unified REVEAL publication policy were selected in the accepted results planning below.
 
 ## Database Foundation Scope
 
@@ -194,14 +194,14 @@ Shared-PASS and overall similarity, zero-denominator UI fallback, evidence thres
 
 The [bounded calculation slice](taste-similarity-v1-implementation.md) is implemented as a [pure module](../src/domain/taste-similarity.ts) with [synthetic tests](../tests/frontend/taste-similarity.test.ts). It uses `taste-love-v1`, 0–1 values without rounding, explicit undefined-component reasons, and no combined score when either component is undefined. That calculation milestone introduced no application result path, database change, real-vote access, or deployment. The category-opening policy selected below now has a separately implemented [server boundary](wrapped-results-server.md); evidence display and undefined-score presentation still need design work.
 
-## Accepted season admin and category opening (2026-10-25)
+## Accepted season admin and publication (2026-10-25; revised 2026-11-16)
 
 | ID | Type | Decision | Rationale |
 | --- | --- | --- | --- |
 | D51 | Product | Love similarity is unavailable before REVEAL and becomes available to same-season members when REVEAL is deliberately entered; no separate category-opening action is required. | Keep the party reveal deliberate without creating a dead intermediate results state. |
 | D52 | Product | The planned per-season admin panel contains the forward lifecycle controls; at REVEAL it links to the results page. Existing forward-only, one-step transitions remain unchanged. | Keep publishing and presentation as one coherent party action. |
 
-The owner approved manual opening and specified its home in the upcoming per-season admin panel. See [wrapped-results-integration-brief.md](wrapped-results-integration-brief.md) for the approved policy and separately marked engineering/UI proposals. The decision update itself introduced no implementation. The subsequent [server slice](wrapped-results-server.md) uses private category storage/audit events, same-season admin configuration RPCs and a guarded member pair-summary RPC. These are engineering choices implementing D49–D52, not new product decisions. The later [bounded panel implementation](season-admin-panel.md) now provides the two approved controls, with deliberate confirmations and distinct lifecycle/visibility recovery. These UI and journal details are engineering choices, not new lifecycle permissions or product formulas. The results screen remains unimplemented. Other categories and detailed result presentation are not automatically approved.
+The original 2026-10-25 decision required a separate manual opening. On 2026-11-16 the owner explicitly replaced it with unified REVEAL publication and removal of the separate admin box. Historical settings/events remain preserved; the retired setter rejects mutations. The panel links to the results route after REVEAL and recovers uncertain lifecycle transitions through authoritative reads. See [current server contract](wrapped-results-server.md) and [closeout](admin-closeout.md). Other categories and detailed result presentation are not automatically approved.
 
 
 ## Interim admin assignment and future season creation (2026-10-25)
@@ -224,6 +224,6 @@ The following implementation scope is approved for the dedicated `season-admin-o
 - Spotify and Apple Music imports share one canonical catalog. Automatic admission requires both provider links, a clean duplicate check against existing catalog/provider mappings, and no ambiguous match. Incomplete or duplicate candidates are held for review while valid items continue.
 - Catalog totals are shown as a compact summary. Adding tracks during `VOTING` preserves existing votes and audit history.
 - A standalone audit/recovery dashboard is deferred. Operation-specific receipts, errors and retry controls remain part of each workflow.
-- Publishing controls apply only to approved result categories. `love_similarity` remains hidden until `REVEAL` and requires deliberate same-season admin opening; other formulas/categories need separate approval.
+- Publishing controls apply only to approved result categories. `love_similarity` remains unavailable until the same-season admin deliberately enters `REVEAL`; no second opening action remains; other formulas/categories need separate approval.
 
 These are accepted product boundaries for implementation. Exact tables, RPC names, provider adapters, review payloads and UI layout remain engineering work and must preserve RLS, locks, immutable history, idempotency and synthetic-test requirements.

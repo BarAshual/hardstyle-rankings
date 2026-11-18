@@ -1,6 +1,6 @@
 # Bounded season admin panel
 
-Implemented locally on 2026-10-25 and revised 2026-11-16. REVEAL is the single deliberate publish action; the panel does not contain a separate Love-similarity visibility box. Confirmation copy, routing and recovery journals are engineering choices; no new product permissions, formulas, categories or admin features are introduced.
+Implemented locally on 2026-10-25, revised 2026-11-16 and verified in the [2026-11-17 closeout](admin-closeout.md). REVEAL is the single deliberate publish action; the panel does not contain a separate Love-similarity visibility box. Confirmation copy, routing and recovery journals are engineering choices; no new product permissions, formulas, categories or admin features are introduced.
 
 ## Entry and authorization
 
@@ -19,11 +19,11 @@ The owner requested database-managed assignment by email for now. Use the existi
 3. In a transaction, lock the selected season row and set only that account's existing membership role to `admin`. Confirm exactly the intended membership before committing. Preserve other admins and all roles in other seasons; replacement/removal is a separate operation.
 4. Refresh the app's season metadata to display the authorized admin entry and controls.
 
-This is owner database maintenance under D20, not a new browser write permission or role-management RPC. Role assignment has no dedicated audit API in the current foundation; it must not rewrite existing votes or audit history. No particular account or database has been changed by this documentation update.
+This describes the original owner bootstrap procedure. The expanded panel now uses `set_member_role` for audited role changes, preserving at least one admin. Bootstrap guidance is not a replacement for that API.
 
 ## Future season creation flow
 
-Requested future work: let a signed-in user create a season from within the platform. Integrate the existing `create_season(p_name, p_year, p_allowance, p_nickname)` contract: it creates a `SETUP` season and its creator's first admin membership atomically. Collect an explicit allowance rather than hard-coding a universal default. Form design, validation/recovery, navigation to the new season and tests remain to be implemented. Invitation delivery and a role-management UI remain separate scope. The current bounded panel still manages existing seasons only.
+Requested future work: let a signed-in user create a season from within the platform. Integrate the existing `create_season(p_name, p_year, p_allowance, p_nickname)` contract: it creates a `SETUP` season and its creator's first admin membership atomically. Collect an explicit allowance rather than hard-coding a universal default. Form design, validation/recovery, navigation to the new season and tests remain to be implemented. Invitation delivery remains separate scope; role controls are now part of the expanded panel. The current bounded panel still manages existing seasons only.
 
 ## Lifecycle mutation contract
 
@@ -45,11 +45,8 @@ The panel and Home are keyed by authenticated user and season. Navigation/accoun
 
 ## Verification and remaining work
 
-- Frontend tests cover all lifecycle states, same-season authorization, confirmation/cancellation, one-step recovery, and account/season isolation. The database suite retains synthetic authorization, pre-REVEAL secrecy, and cross-season isolation coverage; legacy visibility-mutation cases are explicitly retired.
-- `npm run typecheck`, `npm run lint`, and `npm run build`: passed. Source/test verification ran from an environment-free temporary copy using installed dependencies. Documentation links and whitespace checks passed.
-- The actual components were exercised in a browser with fictional in-memory metadata: Home entry, one-step close/reveal, hidden-on-REVEAL, explicit open/hide, focus on Cancel and 320/390 px mobile layout. No browser warnings/errors or horizontal overflow were observed; visible controls met the existing 48 px target. This is synthetic browser evidence, not a real Google or production test.
-- No database contract changed; the database suite was not rerun for this panel slice. Prior real local SQL/Data API server coverage is recorded in the server contract. Real authenticated end-to-end/device checks remain a release integration step on an explicitly disposable target.
+See [admin closeout](admin-closeout.md) for the current test commands, results, Preview status and results-branch handoff. Historical toggle tests have been replaced with unified-publication and lifecycle-recovery coverage. The actual browser regression uses a disposable local Data API and database with synthetic accounts.
 
 The catalog section now supports paired Spotify/Apple source designation, a dry-run payload, evidence summaries, and deliberate distinct/attach/keep/defer/decline review actions before item apply. The operator runner performs read-only Apple matching by ISRC or normalized title/artist and rejects unmatched or ambiguous pairs. Full provider credential management remains intentionally outside the browser; the browser accepts only the bounded candidate payload returned by the operator/provider adapter.
 
-The results screen still needs its design and bounded member read/DTO integration, with hidden/loading/error/defined/undefined evidence states. Other admin features, new formulas, awards and thresholds remain outside this panel. Before a separately authorized rollout, apply the existing server migration to the intended environment; this panel does not apply it or change any existing season by loading.
+The results screen still needs its design and bounded member read/DTO integration, with pre-REVEAL denial/loading/error/defined/undefined evidence states. Other admin features, new formulas, awards and thresholds remain outside this panel. Before a separately authorized rollout, apply the existing server migration to the intended environment; this panel does not apply it or change any existing season by loading.

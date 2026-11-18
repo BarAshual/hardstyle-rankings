@@ -75,8 +75,8 @@ export function validateAdminSeason(
     typeof value.name !== "string" ||
     !value.name.trim() ||
     !seasonStates.includes(value.state) ||
-    typeof value.visible !== "boolean" ||
-    value.canChange !== (value.state === "REVEAL")
+    value.visible !== (value.state === "REVEAL") ||
+    value.canChange !== false
   )
     throw new Error("Invalid admin metadata");
   return value;
